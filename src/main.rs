@@ -110,8 +110,8 @@ fn main() {
                 println!("{}Warning: You have entered a very high amount of rounds! This can result in excessive CPU usage.", Color::Yellow);
                 flush_styles();
                 let new_value = prompt("Are you sure you wish to use that many?");
-                if new_value {
-                    break;
+                if !new_value {
+                    continue;
                 }
             }
             break;
@@ -158,8 +158,8 @@ fn main() {
                 println!("{}Warning: You have entered a very high burt count! This can use large amounts of CPU and Memory (RAM).", Color::Yellow);
                 flush_styles();
                 let new_value = prompt("Are you sure you wish to use that many?");
-                if new_value {
-                    break;
+                if !new_value {
+                    continue;
                 }
             }
             break;
