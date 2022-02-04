@@ -225,17 +225,6 @@ fn main() {
         let red = 255 - (percent_decimal * 255.0) as u8;
         let green = (percent_decimal * 255.0) as u8;
         let color = Color::RGB(red, green, 25);
-        //     = if percent < 25 {
-        //     Color::Red
-        // } else if percent < 50 {
-        //     Color::Yellow
-        // } else if percent < 75 {
-        //     Color::BrightYellow
-        // } else if percent < 100 {
-        //     Color::Green
-        // } else {
-        //     Color::BrightGreen
-        // };
 
         // create the different parts of the bar
         let completed_bar = format!("{}{}", color, "█".repeat(bar_completion));
