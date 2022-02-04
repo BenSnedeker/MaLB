@@ -5,67 +5,9 @@ use crossterm::{cursor, execute};
 use crossterm::terminal::{Clear, ClearType};
 use rand::{Rng, thread_rng};
 use crate::input::{get_num, prompt, get_decimal};
+use pbars::{PBar, BarType};
 
 mod input;
-
-#[derive(Clone, Debug)]
-struct PBar {
-    x: u16,
-    y: u16,
-    percent: f64,
-}
-
-impl PBar {
-    fn new(x: u16, y: u16) -> Self {
-        Self {
-            x, y,
-            percent: 0.0
-        }
-    }
-
-    fn new_at_cursor() -> Self {
-        let (x, y) = cursor::position().expect("Failed to get cursor pos; is this terminal supported?");
-        Self {
-            x, y, percent: 0.0
-        }
-    }
-
-    fn update(&mut self, percentage: f64) {
-        self.percent = percentage;
-    }
-
-    fn draw(&mut self) {
-        let percent = (self.percent * 100.0) as u32;
-
-        // set how complete the bar should be
-        let bar_completion = percent as usize / 5;
-        let mut bar_uncomplete = (100 - (percent as usize)) / 5;
-        // handle if the bar needs to be resized because of rounding issues
-        let add = bar_completion + bar_uncomplete;
-        if add < 20 {
-            bar_uncomplete += 1;
-        }
-        if add > 20 {
-            bar_uncomplete -= 1;
-        }
-
-        // get the current completion color of the bar
-        let red = 255 - (self.percent * 200.0) as u8;
-        let green = ((self.percent * 200.0) as u8);
-        let color = Color::RGB(red, green, 25);
-
-        // create the different parts of the bar
-        let completed_bar = format!("{}{}", color, "█".repeat(bar_completion));
-        let uncompleted_bar = format!("{}{}", Color::BrightBlack, "█".repeat(bar_uncomplete));
-
-        // move to the correct location
-        execute!(stdout(), cursor::MoveTo(self.x, self.y)).expect("Failed to move to the correct location! Is this terminal supported?");
-
-        // Print out the bar
-        print!("{dc}[{}{}{dc}] {}{}{dc}%", completed_bar, uncompleted_bar, color, percent,
-               dc = Color::White);
-    }
-}
 
 pub struct Burt {
     id: u32
@@ -256,7 +198,8 @@ fn main() {
     // print the progress bar and begin populating Burts
     println!("Populating Burts...");
     execute!(stdout(), cursor::Hide).expect("Failed to hide the cursor! This terminal may not be supported!");
-    let mut pbar = PBar::new_at_cursor();
+    let mut pbar = PBar::new_at_cursor(BarType::Bar, true, true, 20)
+        .expect("Failed to get cursor position: is this terminal supported?");
     // make each new burt with x being their id, and update the progress bar
     for x in 0..burt_count {
         // push the new burt into the vector
@@ -264,7 +207,7 @@ fn main() {
 
         // get the percentage of completion
         let percent = x as f64 / (burt_count - 1) as f64;
-        pbar.update(percent);
+        pbar.update((percent * 100.0) as u8);
         pbar.draw();
     }
     // clear the output styles

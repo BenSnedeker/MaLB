@@ -95,6 +95,7 @@ version = "0.1.0"
 dependencies = [
  "better_term",
  "crossterm",
+ "pbars",
  "rand",
 ]
 
@@ -152,6 +153,16 @@ dependencies = [
  "redox_syscall",
  "smallvec",
  "winapi",
+]
+
+[[package]]
+name = "pbars"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "39cef9331f603dfd7366226cf7991afb275b0925be3b6dafb2e3beae8360d4bd"
+dependencies = [
+ "better_term",
+ "crossterm",
 ]
 
 [[package]]

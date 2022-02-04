@@ -8,3 +8,4 @@ authors = ["Ben", "Eric"]
 rand = "*"
 crossterm = "*"
 better_term = "*"
+pbars = "0.1.2"
