@@ -387,6 +387,7 @@ fn main() {
                     }
                 } else {
                     match event.code {
+                        KeyCode::Char('q') => break,
                         KeyCode::Char('h') => active_menu_item = MenuItem::Home,
                         KeyCode::Char('b') => active_menu_item = MenuItem::Burts,
                         KeyCode::Char('?') => {
