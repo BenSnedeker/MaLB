@@ -80,6 +80,7 @@ fn main() {
     let mut input_mode = false;
     let mut user_input = String::new();
     let mut input_ready = false;
+    let mut input_mode_prompt = format!("Input");
 
     let footer_txt = format!("MaLB v{} 2022 created and maintained by Eric Shreve and Ben Snedeker", env!("CARGO_PKG_VERSION"));
 
@@ -303,6 +304,10 @@ fn main() {
                         ]);
                     rect.render_stateful_widget(burts_list_left, burts_chunks[0], &mut burt_list_state);
                     rect.render_widget(burt_detail, burts_chunks[1]);
+
+                    if input_mode {
+                        input_mode_prompt = format!("Enter a Burt ID");
+                    }
                 }
                 MenuItem::Log => {
                     let home = Paragraph::new(vec![
@@ -323,14 +328,13 @@ fn main() {
             }
 
             if input_mode {
-                input_mode = true;
                 let input = Paragraph::new(user_input.clone())
                     .style(Style::default().fg(Color::Gray))
                     .block(
                         Block::default()
                             .borders(Borders::ALL)
                             .style(Style::default().fg(Color::White))
-                            .title("Enter the Burt ID to find")
+                            .title(input_mode_prompt.clone())
                             .border_type(BorderType::Double)
                     );
                 rect.set_cursor(
@@ -341,11 +345,12 @@ fn main() {
 
                 if input_ready {
 
-                    // todo: use the input
+                    // todo: use the input to get the burt ID
 
                     input_ready = false;
                     user_input = String::new();
                 }
+                input_mode_prompt = format!("Input");
             } else {
                 rect.render_widget(footer, chunks[2]);
                 input_mode = false;
@@ -353,9 +358,9 @@ fn main() {
         }).expect("Failed to draw frame with TUI");
 
         // handle keypresses for the UI
-        match rx.recv().expect("Failed to recieve keypress") {
+        match rx.recv().expect("Failed to receive keypress") {
             Event::Input(event) => {
-                if event.code == KeyCode::Esc {
+                if event.code == KeyCode::Char('`') {
                     break;
                 }
                 if input_mode {
@@ -367,7 +372,16 @@ fn main() {
                             user_input.push(c);
                         }
                         KeyCode::Enter => {
+                            input_ready = true;
                             input_mode = !input_mode;
+                        }
+                        KeyCode::Esc => {
+                            input_mode = !input_mode;
+                        }
+                        KeyCode::Backspace => {
+                            if user_input.len() > 0 {
+                                user_input.remove(user_input.len() - 1);
+                            }
                         }
                         _ => {}
                     }
