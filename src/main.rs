@@ -74,13 +74,12 @@ fn main() {
                 println!("{}Warning: The range is greater than the current terminal width! this can cause rendering issues!\n\
                     Current terminal size: {}x{}", Color::Yellow, term_width, term_height);
                 flush_styles();
-                let new_value = prompt("Do you wish to set a different value?");
+                let new_value = prompt("Are you sure you wish to use this number?");
                 if !new_value {
-                    break;
+                    continue;
                 }
-            } else {
-                break;
             }
+            break
         }
         loop {
             // get the desired target number from the user
@@ -222,7 +221,7 @@ fn main() {
 
         // get the current completion color of the bar
         // todo(eric): Maybe make this a scale of red -> green using RGB?
-        let red = 255 - (percent_decimal * 255.0) as u8;
+        let red = 255 - (percent_decimal * 200.0) as u8;
         let green = ((percent_decimal * 200.0) as u8);
         let color = Color::RGB(red, green, 25);
 
