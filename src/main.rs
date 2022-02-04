@@ -77,9 +77,26 @@ fn main() {
     let mut burt_list_state = ListState::default();
     burt_list_state.select(Some(0));
 
+    let mut input_mode = false;
+    let mut user_input = String::new();
+    let mut input_ready = false;
+
+    let footer_txt = format!("MaLB v{} 2022 created and maintained by Eric Shreve and Ben Snedeker", env!("CARGO_PKG_VERSION"));
+
     // start the render loop
     loop {
         terminal.draw(|rect| {
+
+            let footer = Paragraph::new(footer_txt.clone())
+                .style(Style::default().fg(Color::LightCyan))
+                .alignment(Alignment::Center)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .style(Style::default().fg(Color::White))
+                        .title("Info")
+                        .border_type(BorderType::Plain)
+                );
             // setup the layout
             let size = rect.size();
             let chunks = Layout::default()
@@ -155,6 +172,7 @@ fn main() {
                         Span::raw(format!("{} / {}", burt_gang.current_generation, burt_gang.generations)), // generation
                         Span::raw(format!("{}", burt_gang.survival_rate)), // survival rate
                         Span::raw(format!("{}", burt_gang.mutation_rate)), // mutation rate
+                        Span::raw(format!("{}", burt_gang.len())), // burt count
                     ])])
                         .header(Row::new(vec![
                             Span::styled(
@@ -177,6 +195,10 @@ fn main() {
                                 "Mutation Rate",
                                 Style::default().add_modifier(Modifier::BOLD),
                             ),
+                            Span::styled(
+                                "Burt Count",
+                                Style::default().add_modifier(Modifier::BOLD),
+                            ),
                         ]))
                         .block(
                             Block::default()
@@ -186,6 +208,7 @@ fn main() {
                                 .border_type(BorderType::Plain),
                         )
                         .widths(&[
+                            Constraint::Percentage(10),
                             Constraint::Percentage(10),
                             Constraint::Percentage(10),
                             Constraint::Percentage(10),
@@ -213,7 +236,7 @@ fn main() {
                         .iter()
                         .map(|burt| {
                             ListItem::new(Spans::from(vec![Span::styled(
-                                format!("Burt#{}", burt.get_id().clone()),
+                                format!("Burt #{}", burt.get_id().clone()),
                                 Style::default(),
                             )]))
                         })
@@ -234,7 +257,8 @@ fn main() {
                             .add_modifier(Modifier::BOLD),
                     );
 
-                    let burt_detail = Table::new(vec![Row::new(vec![
+                    let burt_detail = Table::new(vec![
+                        Row::new(vec![
                         Span::raw(format!("Burt #{}", selected_burt.get_id())), // id
                         Span::raw("?".to_string()), // score
                         Span::raw("?".to_string()), // guess
@@ -267,7 +291,7 @@ fn main() {
                             Block::default()
                                 .borders(Borders::ALL)
                                 .style(Style::default().fg(Color::White))
-                                .title("Details")
+                                .title("Burt Details")
                                 .border_type(BorderType::Plain),
                         )
                         .widths(&[
@@ -298,67 +322,102 @@ fn main() {
                 }
             }
 
-            // create the footer
-            let footer_txt = format!("MaLB v{} 2022 created and maintained by Eric Shreve and Ben Snedeker", env!("CARGO_PKG_VERSION"));
-            let footer = Paragraph::new(footer_txt)
-                .style(Style::default().fg(Color::LightCyan))
-                .alignment(Alignment::Center)
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .style(Style::default().fg(Color::White))
-                        .title("Info")
-                        .border_type(BorderType::Plain)
+            if input_mode {
+                input_mode = true;
+                let input = Paragraph::new(user_input.clone())
+                    .style(Style::default().fg(Color::Gray))
+                    .block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .style(Style::default().fg(Color::White))
+                            .title("Enter the Burt ID to find")
+                            .border_type(BorderType::Double)
+                    );
+                rect.set_cursor(
+                    chunks[2].x + user_input.len() as u16 + 1,
+                    chunks[2].y + 1,
                 );
+                rect.render_widget(input, chunks[2]);
 
-            rect.render_widget(footer, chunks[2]);
+                if input_ready {
+
+                    // todo: use the input
+
+                    input_ready = false;
+                    user_input = String::new();
+                }
+            } else {
+                rect.render_widget(footer, chunks[2]);
+                input_mode = false;
+            }
         }).expect("Failed to draw frame with TUI");
 
         // handle keypresses for the UI
         match rx.recv().expect("Failed to recieve keypress") {
-            Event::Input(event) => match event.code {
-                KeyCode::Char('q') => {
-                    disable_raw_mode().expect("Failed to disable raw mode!");
-                    terminal.show_cursor().expect("Failed to show cursor!");
+            Event::Input(event) => {
+                if event.code == KeyCode::Esc {
                     break;
                 }
-                KeyCode::Char('h') => active_menu_item = MenuItem::Home,
-                KeyCode::Char('b') => active_menu_item = MenuItem::Burts,
-                KeyCode::Char('l') => active_menu_item = MenuItem::Log,
-                KeyCode::Down => {
-                    if let Some(selected) = burt_list_state.selected() {
-                        let amnt_burts = burt_gang.len();
-                        if selected >= amnt_burts - 1 {
-                            burt_list_state.select(Some(0));
-                        } else {
-                            burt_list_state.select(Some(selected + 1));
+                if input_mode {
+                    match event.code {
+                        KeyCode::Char('?') => {
+                            input_mode = false;
                         }
+                        KeyCode::Char(c) => {
+                            user_input.push(c);
+                        }
+                        KeyCode::Enter => {
+                            input_mode = !input_mode;
+                        }
+                        _ => {}
+                    }
+                } else {
+                    match event.code {
+                        KeyCode::Char('h') => active_menu_item = MenuItem::Home,
+                        KeyCode::Char('b') => active_menu_item = MenuItem::Burts,
+                        KeyCode::Char('?') => {
+                            input_mode = !input_mode;
+                        }
+                        KeyCode::Char('l') => active_menu_item = MenuItem::Log,
+                        KeyCode::Down => {
+                            if let Some(selected) = burt_list_state.selected() {
+                                let amnt_burts = burt_gang.len();
+                                if selected >= amnt_burts - 1 {
+                                    burt_list_state.select(Some(0));
+                                } else {
+                                    burt_list_state.select(Some(selected + 1));
+                                }
+                            }
+                        }
+                        KeyCode::Up => {
+                            if let Some(selected) = burt_list_state.selected() {
+                                let amnt_burts = burt_gang.len();
+                                if selected > 0 {
+                                    burt_list_state.select(Some(selected - 1));
+                                } else {
+                                    burt_list_state.select(Some(amnt_burts - 1));
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                 }
-                KeyCode::Up => {
-                    if let Some(selected) = burt_list_state.selected() {
-                        let amnt_burts = burt_gang.len();
-                        if selected > 0 {
-                            burt_list_state.select(Some(selected - 1));
-                        } else {
-                            burt_list_state.select(Some(amnt_burts - 1));
-                        }
-                    }
-                }
-                KeyCode::Right => {
-
-                }
-                KeyCode::Left => {
-
-                }
-                _ => {}
             }
             Event::Tick => {}
         }
 
     }
 
-    terminal.clear().expect("Failed to clear screen!");
-
+    // restore terminal
+    disable_raw_mode().expect("Failed to restore terminal");
+    terminal.clear().expect("Failed to restore terminal");
+    execute!(
+        terminal.backend_mut(),
+        terminal::LeaveAlternateScreen,
+        event::DisableMouseCapture,
+        MoveTo(0,0),
+        terminal::Clear(ClearType::All)
+    ).expect("Failed to restore terminal");
+    terminal.show_cursor().expect("Failed to restore terminal");
 
 }
