@@ -163,7 +163,8 @@ fn main() {
             }
             break;
         }
-        println!();
+        // clear the screen for printing
+        execute!(stdout(), Clear(ClearType::All), cursor::MoveTo(0,0)).expect("Failed to set up terminal! Are you using a supported terminal?");
     }
 
     // printing out the values with style
