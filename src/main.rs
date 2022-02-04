@@ -223,7 +223,7 @@ fn main() {
         // get the current completion color of the bar
         // todo(eric): Maybe make this a scale of red -> green using RGB?
         let red = 255 - (percent_decimal * 255.0) as u8;
-        let green = (percent_decimal * 255.0) as u8;
+        let green = ((percent_decimal * 200.0) as u8);
         let color = Color::RGB(red, green, 25);
 
         // create the different parts of the bar
