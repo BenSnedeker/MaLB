@@ -1,6 +1,6 @@
 [package]
 name = "malb"
-version = "0.1.0"
+version = "1.0.1"
 edition = "2021"
 authors = ["Ben", "Eric"]
 
@@ -9,3 +9,4 @@ rand = "*"
 crossterm = "*"
 better_term = "*"
 pbars = "0.1.2"
+tui = "*"

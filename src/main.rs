@@ -1,220 +1,364 @@
-use std::env;
+use std::{env, thread};
 use std::io::stdout;
-use better_term::{Color, flush_styles};
-use crossterm::{cursor, execute};
-use crossterm::terminal::{Clear, ClearType};
-use rand::{Rng, thread_rng};
-use crate::input::{get_num, prompt, get_decimal};
-use pbars::{PBar, BarType};
+use std::sync::mpsc;
+use std::time::{Duration, Instant};
+use crossterm::{event, execute, terminal};
+use crossterm::cursor::MoveTo;
+use crossterm::terminal::{ClearType, disable_raw_mode, enable_raw_mode};
+use crossterm::event::{Event as CEvent, KeyCode};
+use tui::backend::CrosstermBackend;
+use tui::layout::{Alignment, Constraint, Direction, Layout};
+use tui::style::{Color, Modifier, Style};
+use tui::Terminal;
+use tui::text::{Span, Spans};
+use tui::widgets::{Block, Borders, BorderType, List, ListItem, ListState, Paragraph, Row, Table, Tabs};
+use crate::burt::{BurtGang, get_burt_gang, populate_burts};
+use crate::ui::{Event, MenuItem};
 
-mod input;
-
-pub struct Burt {
-    id: u32
-}
-
-impl Burt {
-    fn new(id: u32) -> Self {
-        Self {
-            id,
-        }
-    }
-
-    fn get_id(&self) -> u32 {
-        self.id.clone()
-    }
-}
+pub(crate) mod input;
+mod ui;
+mod burt;
 
 fn main() {
-    // get the environment args for parsing
-    let args = env::args().collect::<Vec<String>>();
 
-    // clear the screen for printing
-    execute!(stdout(), Clear(ClearType::All), cursor::MoveTo(0,0)).expect("Failed to set up terminal! Are you using a supported terminal?");
+    // get arguments
+    let args: Vec<String> = env::args().collect();
 
-    // the vec to hold the burts
-    let mut burts: Vec<Burt> = Vec::new();
+    // clear the screen and set terminal position
+    execute!(stdout(), terminal::Clear(ClearType::All), MoveTo(0,0)).expect("Failed to clear screen! Is this terminal supported?");
 
-    // get the terminal size for displaying
-    let (term_width, term_height) = crossterm::terminal::size().expect("Failed to get terminal size");
-
-    // the input variables
-    let mut range: u32;
-    let mut target: u32;
-    let mut generations: u32;
-    let mut survival_rate: f32;
-    let mut mutation_rate: f32;
-    let mut burt_count: u32;
-
-    // populate the input variables
-    if args.contains(&"-d".to_string()) || args.contains(&"--defaults".to_string()) {
-        // set the defaults of the variables
-        range = term_width as u32;
-        target = thread_rng().gen_range(0..range);
-        generations = 1000;
-        survival_rate = 0.50;
-        mutation_rate = 0.25;
-        burt_count = 100000;
+    // initialize the burts
+    let burt_gang = if args.contains(&"-d".to_string()) || args.contains(&"--default".to_string()) {
+        BurtGang::new(populate_burts(10000), 100, 7, 150, 0.5, 0.25)
     } else {
-        // get the user input for the variables
+        get_burt_gang()
+    };
+
+    println!("{}", &burt_gang);
+
+    thread::sleep(Duration::from_millis(3000));
+
+    // enable terminal raw mode and set up the terminal
+    enable_raw_mode().expect("Failed to enable raw mode; is this terminal supported?");
+
+    let mut stdout = stdout();
+    execute!(stdout, terminal::EnterAlternateScreen, event::EnableMouseCapture).expect("Failed to setup terminal; Is this terminal supported?");
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend).expect("Failed to setup terminal; Is this terminal supported?");
+    terminal.clear().expect("Failed to clear the terminal");
+
+    // Initialize the event loop for the UI
+    let (tx, rx) = mpsc::channel();
+    let tick_rate = Duration::from_millis(200);
+
+    thread::spawn(move || {
+        let mut last_tick = Instant::now();
+
         loop {
-            // get the desired range from the user
-            let input = get_num("Enter a number above 0 for how large the range should be");
-            if input.is_none() {
-                continue;
-            }
-            range = input.unwrap();
-            // if it is 0, error and try again
-            if range < 1 {
-                println!("{}Warning: The range can not be zero!", Color::Yellow);
-                flush_styles();
-                continue;
-            }
-            // if the range is greater than the terminal width, warn the user and ask if they want to change the range
-            if range > term_width as u32 {
-                println!("{}Warning: The range is greater than the current terminal width! this can cause rendering issues!\n\
-                    Current terminal size: {}x{}", Color::Yellow, term_width, term_height);
-                flush_styles();
-                let new_value = prompt("Are you sure you wish to use this number?");
-                if !new_value {
-                    continue;
+            let timeout = tick_rate.checked_sub(last_tick.elapsed())
+                .unwrap_or_else(|| Duration::from_secs(0));
+
+            if event::poll(timeout).expect("Failed to poll events") {
+                if let CEvent::Key(key) = event::read().expect("Failed to read events.") {
+                    tx.send(Event::Input(key)).expect("Failed to send event to main thread");
+                }
+                if last_tick.elapsed() >= tick_rate {
+                    tx.send(Event::Tick).expect("Failed to send tick update");
+                    last_tick = Instant::now();
                 }
             }
-            break
         }
-        loop {
-            // get the desired target number from the user
-            let input = get_num(format!("Enter the target (between 0 and {})", range));
-            if input.is_none() {
-                continue;
-            }
-            target = input.unwrap();
-            // if the target is not in the range, ask for a new number
-            if !(0..range).contains(&target) {
-                println!("{}Warning: The target must be within the range! Range: 0 to {}", Color::Yellow, range);
-                flush_styles();
-            } else {
-                break;
-            }
-        }
-        loop {
-            // get the desired amount of rounds / generations from the user
-            // this *can* be zero, but it will mean the program does nothing
-            let input = get_num("Enter how many generations there should be");
-            if input.is_none() {
-                continue;
-            }
-            generations = input.unwrap();
-            // if the burt count is greater than 100k warn the user about high memory and cpu usage
-            if generations > 100000 {
-                println!("{}Warning: You have entered a very high amount of rounds! This can result in excessive CPU usage.", Color::Yellow);
-                flush_styles();
-                let new_value = prompt("Are you sure you wish to use that many?");
-                if !new_value {
-                    continue;
+    });
+
+    // render loop variables
+    let menu_titles = vec!["Home", "Burts", "Log", "Quit"];
+    let mut active_menu_item = MenuItem::Home;
+
+    let mut burt_list_state = ListState::default();
+    burt_list_state.select(Some(0));
+
+    // start the render loop
+    loop {
+        terminal.draw(|rect| {
+            // setup the layout
+            let size = rect.size();
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .margin(2)
+                .constraints([
+                    Constraint::Length(3),
+                    Constraint::Min(2),
+                    Constraint::Length(3),
+                ].as_ref())
+                .split(size);
+
+            // create the menu bar
+            let menu: Vec<Spans> = menu_titles
+                .iter()
+                .map(|t| {
+                    let (first, rest) = t.split_at(1);
+                    Spans::from(vec![
+                        Span::styled(
+                            first,
+                            Style::default()
+                                .fg(Color::Yellow)
+                                .add_modifier(Modifier::UNDERLINED)
+                        ),
+                        Span::styled(rest, Style::default().fg(Color::White))
+                    ])
+                }).collect();
+
+            let tabs = Tabs::new(menu)
+                .select(active_menu_item.into())
+                .block(Block::default().title("Menu").borders(Borders::ALL))
+                .style(Style::default().fg(Color::White))
+                .highlight_style(Style::default().fg(Color::Yellow))
+                .divider(Span::raw("|"));
+
+            rect.render_widget(tabs, chunks[0]);
+
+            // handle the main page
+            match active_menu_item {
+                MenuItem::Home => {
+                    let home_chunks = Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints(
+                            [Constraint::Percentage(70), Constraint::Percentage(30)].as_ref(),
+                        )
+                        .split(chunks[1]);
+
+                    let home = Paragraph::new(vec![
+                        Spans::from(vec![Span::raw("")]),
+                        Spans::from(vec![Span::raw("Welcome")]),
+                        Spans::from(vec![Span::raw("")]),
+                        Spans::from(vec![Span::raw("to")]),
+                        Spans::from(vec![Span::raw("")]),
+                        Spans::from(vec![Span::styled(
+                            "MaLB",
+                            Style::default().fg(Color::LightYellow),
+                        )]),
+                        Spans::from(vec![Span::raw("")]),
+                        Spans::from(vec![Span::raw("Press 'h' for Home, 'b' for Burts, 'l' for Logs, and 'q' for Quit")]),
+                    ])
+                        .alignment(Alignment::Center)
+                        .block(
+                            Block::default()
+                                .borders(Borders::ALL)
+                                .style(Style::default().fg(Color::White))
+                                .title("Home")
+                                .border_type(BorderType::Plain),
+                        );
+
+                    let home_details = Table::new(vec![Row::new(vec![
+                        Span::raw(format!("{}", burt_gang.target)), // target
+                        Span::raw(format!("{}", burt_gang.range)), // range
+                        Span::raw(format!("{} / {}", burt_gang.current_generation, burt_gang.generations)), // generation
+                        Span::raw(format!("{}", burt_gang.survival_rate)), // survival rate
+                        Span::raw(format!("{}", burt_gang.mutation_rate)), // mutation rate
+                    ])])
+                        .header(Row::new(vec![
+                            Span::styled(
+                                "Target",
+                                Style::default().add_modifier(Modifier::BOLD),
+                            ),
+                            Span::styled(
+                                "Range",
+                                Style::default().add_modifier(Modifier::BOLD),
+                            ),
+                            Span::styled(
+                                "Generation",
+                                Style::default().add_modifier(Modifier::BOLD),
+                            ),
+                            Span::styled(
+                                "Survival Rate",
+                                Style::default().add_modifier(Modifier::BOLD),
+                            ),
+                            Span::styled(
+                                "Mutation Rate",
+                                Style::default().add_modifier(Modifier::BOLD),
+                            ),
+                        ]))
+                        .block(
+                            Block::default()
+                                .borders(Borders::ALL)
+                                .style(Style::default().fg(Color::White))
+                                .title("Details")
+                                .border_type(BorderType::Plain),
+                        )
+                        .widths(&[
+                            Constraint::Percentage(10),
+                            Constraint::Percentage(10),
+                            Constraint::Percentage(10),
+                            Constraint::Percentage(10),
+                            Constraint::Percentage(10),
+                        ]);
+                    rect.render_widget(home, home_chunks[0]);
+                    rect.render_widget(home_details, home_chunks[1]);
+                }
+                MenuItem::Burts => {
+                    let burts_chunks = Layout::default()
+                        .direction(Direction::Horizontal)
+                        .constraints(
+                            [Constraint::Percentage(20), Constraint::Percentage(80)].as_ref(),
+                        )
+                        .split(chunks[1]);
+                    let burts = Block::default()
+                        .borders(Borders::ALL)
+                        .style(Style::default().fg(Color::White))
+                        .title("Burts")
+                        .border_type(BorderType::Plain);
+
+                    let burt_list = &burt_gang;
+                    let items: Vec<_> = burt_list
+                        .iter()
+                        .map(|burt| {
+                            ListItem::new(Spans::from(vec![Span::styled(
+                                format!("Burt#{}", burt.get_id().clone()),
+                                Style::default(),
+                            )]))
+                        })
+                        .collect();
+
+                    let selected_burt = burt_list
+                        .get(
+                            burt_list_state
+                                .selected()
+                                .expect("there is always a selected burt"),
+                        )
+                        .clone();
+
+                    let burts_list_left = List::new(items).block(burts).highlight_style(
+                        Style::default()
+                            .bg(Color::Yellow)
+                            .fg(Color::Black)
+                            .add_modifier(Modifier::BOLD),
+                    );
+
+                    let burt_detail = Table::new(vec![Row::new(vec![
+                        Span::raw(format!("Burt #{}", selected_burt.get_id())), // id
+                        Span::raw("?".to_string()), // score
+                        Span::raw("?".to_string()), // guess
+                        Span::raw("?".to_string()), // mu
+                        Span::raw("?".to_string()), // sigma
+                    ])])
+                        .header(Row::new(vec![
+                            Span::styled(
+                                "ID",
+                                Style::default().add_modifier(Modifier::BOLD),
+                            ),
+                            Span::styled(
+                                "Score",
+                                Style::default().add_modifier(Modifier::BOLD),
+                            ),
+                            Span::styled(
+                                "Guess",
+                                Style::default().add_modifier(Modifier::BOLD),
+                            ),
+                            Span::styled(
+                                "Mu",
+                                Style::default().add_modifier(Modifier::BOLD),
+                            ),
+                            Span::styled(
+                                "Sigma",
+                                Style::default().add_modifier(Modifier::BOLD),
+                            ),
+                        ]))
+                        .block(
+                            Block::default()
+                                .borders(Borders::ALL)
+                                .style(Style::default().fg(Color::White))
+                                .title("Details")
+                                .border_type(BorderType::Plain),
+                        )
+                        .widths(&[
+                            Constraint::Percentage(10),
+                            Constraint::Percentage(10),
+                            Constraint::Percentage(20),
+                            Constraint::Percentage(5),
+                            Constraint::Percentage(20),
+                        ]);
+                    rect.render_stateful_widget(burts_list_left, burts_chunks[0], &mut burt_list_state);
+                    rect.render_widget(burt_detail, burts_chunks[1]);
+                }
+                MenuItem::Log => {
+                    let home = Paragraph::new(vec![
+                        Spans::from(vec![Span::raw("")]),
+                        Spans::from(vec![Span::raw("The Logs feature is not currently implemented!")]),
+                        Spans::from(vec![Span::raw("")]),
+                    ])
+                        .alignment(Alignment::Center)
+                        .block(
+                            Block::default()
+                                .borders(Borders::ALL)
+                                .style(Style::default().fg(Color::White))
+                                .title("Home")
+                                .border_type(BorderType::Plain),
+                        );
+                    rect.render_widget(home, chunks[1]);
                 }
             }
-            break;
-        }
-        loop {
-            // get the desired survival rate from the user
-            let input = get_decimal("Enter the survival rate between 0 and 1");
-            if input.is_none() {
-                continue;
-            }
-            survival_rate = input.unwrap();
-            // if it is 1, 0, or outside that range, get a different number
-            if survival_rate >= 1.0 || survival_rate <= 0.0 {
-                println!("{}Warning: The survival rate must be between 0 and 1, not including 0 and 1.", Color::Yellow);
-                flush_styles();
-            } else {
-                break;
-            }
-        }
-        loop {
-            // get the desired mutation rate from the user
-            let input = get_decimal("Enter the mutation rate between 0 and 1");
-            if input.is_none() {
-                continue;
-            }
-            mutation_rate = input.unwrap();
-            // if it is 1, 0, or outside that range, get a different number
-            if mutation_rate >= 1.0 || mutation_rate <= 0.0 {
-                println!("{}Warning: The mutation rate must be between 0 and 1, not including 0 and 1.", Color::Yellow);
-                flush_styles();
-            } else {
-                break;
-            }
-        }
-        loop {
-            // get the desired amount of burts to use
-            let input = get_num("Enter how many Burts should be used");
-            if input.is_none() {
-                continue;
-            }
-            burt_count = input.unwrap();
-            // if the burt count is greater than 100k warn the user about high memory and cpu usage
-            if burt_count > 100000 {
-                println!("{}Warning: You have entered a very high burt count! This can use large amounts of CPU and Memory (RAM).", Color::Yellow);
-                flush_styles();
-                let new_value = prompt("Are you sure you wish to use that many?");
-                if !new_value {
-                    continue;
+
+            // create the footer
+            let footer_txt = format!("MaLB v{} 2022 created and maintained by Eric Shreve and Ben Snedeker", env!("CARGO_PKG_VERSION"));
+            let footer = Paragraph::new(footer_txt)
+                .style(Style::default().fg(Color::LightCyan))
+                .alignment(Alignment::Center)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .style(Style::default().fg(Color::White))
+                        .title("Info")
+                        .border_type(BorderType::Plain)
+                );
+
+            rect.render_widget(footer, chunks[2]);
+        }).expect("Failed to draw frame with TUI");
+
+        // handle keypresses for the UI
+        match rx.recv().expect("Failed to recieve keypress") {
+            Event::Input(event) => match event.code {
+                KeyCode::Char('q') => {
+                    disable_raw_mode().expect("Failed to disable raw mode!");
+                    terminal.show_cursor().expect("Failed to show cursor!");
+                    break;
                 }
+                KeyCode::Char('h') => active_menu_item = MenuItem::Home,
+                KeyCode::Char('b') => active_menu_item = MenuItem::Burts,
+                KeyCode::Char('l') => active_menu_item = MenuItem::Log,
+                KeyCode::Down => {
+                    if let Some(selected) = burt_list_state.selected() {
+                        let amnt_burts = burt_gang.len();
+                        if selected >= amnt_burts - 1 {
+                            burt_list_state.select(Some(0));
+                        } else {
+                            burt_list_state.select(Some(selected + 1));
+                        }
+                    }
+                }
+                KeyCode::Up => {
+                    if let Some(selected) = burt_list_state.selected() {
+                        let amnt_burts = burt_gang.len();
+                        if selected > 0 {
+                            burt_list_state.select(Some(selected - 1));
+                        } else {
+                            burt_list_state.select(Some(amnt_burts - 1));
+                        }
+                    }
+                }
+                KeyCode::Right => {
+
+                }
+                KeyCode::Left => {
+
+                }
+                _ => {}
             }
-            break;
+            Event::Tick => {}
         }
-        // clear the screen for printing
-        execute!(stdout(), Clear(ClearType::All), cursor::MoveTo(0,0)).expect("Failed to set up terminal! Are you using a supported terminal?");
+
     }
 
-    // printing out the values with style
-    let lines = vec![format!("Range:         {}", range),
-                     format!("Target:        {}", range),
-                     format!("Generations:   {}", generations),
-                     format!("Survival rate: {}", survival_rate),
-                     format!("Mutation rate: {}", mutation_rate),
-                     format!("# of burts:    {}",   burt_count)];
+    terminal.clear().expect("Failed to clear screen!");
 
-    // get the longest line
-    let mut longest = 0;
-    for l in &lines {
-        if l.len() > longest {
-            longest = l.len();
-        }
-    }
 
-    // the lines to print out
-    let mut new_lines = Vec::new();
-
-    // generate the | after
-    for l in &lines {
-        new_lines.push(format!("│ {}{} │", l.clone(), " ".repeat(longest - l.len())));
-    }
-
-    // print out the values of the variables
-    println!("┌{t}┐\n{}\n└{t}┘\n", new_lines.join("\n"), t = "─".repeat(new_lines.first().unwrap().len() - 6));
-
-    // print the progress bar and begin populating Burts
-    println!("Populating Burts...");
-    execute!(stdout(), cursor::Hide).expect("Failed to hide the cursor! This terminal may not be supported!");
-    let mut pbar = PBar::new_at_cursor(BarType::Bar, true, true, 20)
-        .expect("Failed to get cursor position: is this terminal supported?");
-    // make each new burt with x being their id, and update the progress bar
-    for x in 0..burt_count {
-        // push the new burt into the vector
-        burts.push(Burt::new(x));
-
-        // get the percentage of completion
-        let percent = x as f64 / (burt_count - 1) as f64;
-        pbar.update((percent * 100.0) as u8);
-        pbar.draw();
-    }
-    // clear the output styles
-    flush_styles();
-    // print out completion message and show the cursor
-    println!("\nPopulated {} Burts!", burt_count);
-    execute!(stdout(), cursor::Show).expect("Failed to reshow cursor! This terminal may not be supported!");
-
-    println!("The program doesn't do anything past this yet!");
 }
