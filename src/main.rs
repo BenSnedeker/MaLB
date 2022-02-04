@@ -82,7 +82,8 @@ fn main() {
     let mut input_ready = false;
     let mut input_mode_prompt = format!("Input");
 
-    let footer_txt = format!("MaLB v{} 2022 created and maintained by Eric Shreve and Ben Snedeker", env!("CARGO_PKG_VERSION"));
+    let default_footer_txt = format!("MaLB v{} 2022 created and maintained by Eric Shreve and Ben Snedeker", env!("CARGO_PKG_VERSION"));
+    let mut footer_txt = default_footer_txt.clone();
 
     // start the render loop
     loop {
@@ -138,6 +139,7 @@ fn main() {
             // handle the main page
             match active_menu_item {
                 MenuItem::Home => {
+                    footer_txt = default_footer_txt.clone();
                     let home_chunks = Layout::default()
                         .direction(Direction::Vertical)
                         .constraints(
@@ -156,7 +158,7 @@ fn main() {
                             Style::default().fg(Color::LightYellow),
                         )]),
                         Spans::from(vec![Span::raw("")]),
-                        Spans::from(vec![Span::raw("Press 'h' for Home, 'b' for Burts, 'l' for Logs, and 'q' for Quit")]),
+                        Spans::from(vec![Span::raw("Press 'h' for Home, 'b' for Burts, 'l' for Logs, 'f' to run a command, and 'q' for Quit")]),
                     ])
                         .alignment(Alignment::Center)
                         .block(
@@ -306,13 +308,38 @@ fn main() {
 
                     if input_ready {
                         // handle burt id search
+                        for c in user_input.chars() {
+                            if !c.is_numeric() {
+                                footer_txt = format!("{}Invalid Input: must be a number!", better_term::Color::Red);
+                            }
+                        }
 
+                        let number = user_input.parse::<usize>();
+
+                        if number.is_err() {
+                            footer_txt = format!("{}Invalid Input: must be a number!", better_term::Color::Red);
+                            input_ready = false;
+                            user_input = String::new();
+                            return;
+                        }
+
+                        let n = number.unwrap();
+
+                        if n >= burt_gang.len() {
+                            footer_txt = format!("{}Number must be a valid burt id! {} is too large!", better_term::Color::Red, n);
+                            input_ready = false;
+                            user_input = String::new();
+                            return;
+                        }
+
+                        burt_list_state.select(Some(n));
 
                         input_ready = false;
                         user_input = String::new();
                     }
                 }
                 MenuItem::Log => {
+                    footer_txt = default_footer_txt.clone();
                     let home = Paragraph::new(vec![
                         Spans::from(vec![Span::raw("")]),
                         Spans::from(vec![Span::raw("The Logs feature is not currently implemented!")]),
@@ -393,7 +420,7 @@ fn main() {
                         KeyCode::Char('q') => break,
                         KeyCode::Char('h') => active_menu_item = MenuItem::Home,
                         KeyCode::Char('b') => active_menu_item = MenuItem::Burts,
-                        KeyCode::Char('?') => {
+                        KeyCode::Char('f') => {
                             input_mode = !input_mode;
                         }
                         KeyCode::Char('l') => active_menu_item = MenuItem::Log,

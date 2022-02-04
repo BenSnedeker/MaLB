@@ -112,7 +112,7 @@ pub fn populate_burts(burt_count: u32) -> Vec<Burt> {
         pbar.update((percent * 100.0) as u8);
         pbar.draw();
         println!();
-        println!("Burts: {} / {}", x, burt_count);
+        println!("Burts: {} / {}", x + 1, burt_count);
     }
     // clear the output styles
     flush_styles();
