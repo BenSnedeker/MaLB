@@ -260,17 +260,13 @@ fn main() {
 
                     let burt_detail = Table::new(vec![
                         Row::new(vec![
-                        Span::raw(format!("Burt #{}", selected_burt.get_id())), // id
+                        //Span::raw(format!("Burt #{}", selected_burt.get_id())), // id
                         Span::raw("?".to_string()), // score
                         Span::raw("?".to_string()), // guess
                         Span::raw("?".to_string()), // mu
                         Span::raw("?".to_string()), // sigma
                     ])])
                         .header(Row::new(vec![
-                            Span::styled(
-                                "ID",
-                                Style::default().add_modifier(Modifier::BOLD),
-                            ),
                             Span::styled(
                                 "Score",
                                 Style::default().add_modifier(Modifier::BOLD),
@@ -292,11 +288,10 @@ fn main() {
                             Block::default()
                                 .borders(Borders::ALL)
                                 .style(Style::default().fg(Color::White))
-                                .title("Burt Details")
+                                .title(format!("Burt #{}", selected_burt.get_id()))
                                 .border_type(BorderType::Plain),
                         )
                         .widths(&[
-                            Constraint::Percentage(10),
                             Constraint::Percentage(10),
                             Constraint::Percentage(20),
                             Constraint::Percentage(5),
@@ -307,6 +302,14 @@ fn main() {
 
                     if input_mode {
                         input_mode_prompt = format!("Enter a Burt ID");
+                    }
+
+                    if input_ready {
+                        // handle burt id search
+
+
+                        input_ready = false;
+                        user_input = String::new();
                     }
                 }
                 MenuItem::Log => {
@@ -345,7 +348,7 @@ fn main() {
 
                 if input_ready {
 
-                    // todo: use the input to get the burt ID
+                    // todo: use the input
 
                     input_ready = false;
                     user_input = String::new();

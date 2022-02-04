@@ -121,7 +121,6 @@ pub fn populate_burts(burt_count: u32) -> Vec<Burt> {
 }
 
 pub fn get_burt_gang() -> BurtGang {
-
     // get the terminal size for displaying
     let (term_width, term_height) = crossterm::terminal::size().expect("Failed to get terminal size");
 
