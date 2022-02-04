@@ -28,7 +28,7 @@ fn main() {
     execute!(stdout(), terminal::Clear(ClearType::All), MoveTo(0,0)).expect("Failed to clear screen! Is this terminal supported?");
 
     // initialize the burts
-    let burt_gang = if args.contains(&"-d".to_string()) || args.contains(&"--default".to_string()) {
+    let mut burt_gang = if args.contains(&"-d".to_string()) || args.contains(&"--default".to_string()) {
         BurtGang::new(populate_burts(10000), 100, 7, 150, 0.5, 0.25)
     } else {
         get_burt_gang()
@@ -84,21 +84,25 @@ fn main() {
 
     let default_footer_txt = format!("MaLB v{} 2022 created and maintained by Eric Shreve and Ben Snedeker", env!("CARGO_PKG_VERSION"));
     let mut footer_txt = default_footer_txt.clone();
+    let default_footer_col = Color::LightCyan;
+    let mut footer_col = default_footer_col.clone();
+
+    let error_time = Duration::from_millis(3000);
+    let mut error_start: Option<Instant> = None;
 
     // start the render loop
     loop {
+        let footer = Paragraph::new(footer_txt.clone())
+            .style(Style::default().fg(footer_col))
+            .alignment(Alignment::Center)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .style(Style::default().fg(Color::White))
+                    .title("Info")
+                    .border_type(BorderType::Plain)
+            );
         terminal.draw(|rect| {
-
-            let footer = Paragraph::new(footer_txt.clone())
-                .style(Style::default().fg(Color::LightCyan))
-                .alignment(Alignment::Center)
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .style(Style::default().fg(Color::White))
-                        .title("Info")
-                        .border_type(BorderType::Plain)
-                );
             // setup the layout
             let size = rect.size();
             let chunks = Layout::default()
@@ -139,7 +143,6 @@ fn main() {
             // handle the main page
             match active_menu_item {
                 MenuItem::Home => {
-                    footer_txt = default_footer_txt.clone();
                     let home_chunks = Layout::default()
                         .direction(Direction::Vertical)
                         .constraints(
@@ -158,7 +161,7 @@ fn main() {
                             Style::default().fg(Color::LightYellow),
                         )]),
                         Spans::from(vec![Span::raw("")]),
-                        Spans::from(vec![Span::raw("Press 'h' for Home, 'b' for Burts, 'l' for Logs, 'f' to run a command, and 'q' for Quit")]),
+                        Spans::from(vec![Span::raw("Press 'h' for Home, 'b' for Burts, 'l' for Logs, 't' to run a command, and 'q' for Quit")]),
                     ])
                         .alignment(Alignment::Center)
                         .block(
@@ -310,25 +313,33 @@ fn main() {
                         // handle burt id search
                         for c in user_input.chars() {
                             if !c.is_numeric() {
-                                footer_txt = format!("{}Invalid Input: must be a number!", better_term::Color::Red);
+                                footer_txt = format!("Invalid Input: must be a number!");
+                                footer_col = Color::LightRed;
+                                user_input = String::new();
+                                error_start = Some(Instant::now());
+                                return;
                             }
                         }
 
                         let number = user_input.parse::<usize>();
 
                         if number.is_err() {
-                            footer_txt = format!("{}Invalid Input: must be a number!", better_term::Color::Red);
+                            footer_txt = format!("Invalid Input: must be a number!");
+                            footer_col = Color::LightRed;
                             input_ready = false;
                             user_input = String::new();
+                            error_start = Some(Instant::now());
                             return;
                         }
 
                         let n = number.unwrap();
 
                         if n >= burt_gang.len() {
-                            footer_txt = format!("{}Number must be a valid burt id! {} is too large!", better_term::Color::Red, n);
+                            footer_txt = format!("Number must be a valid burt id! {} is too large!", n);
+                            footer_col = Color::LightRed;
                             input_ready = false;
                             user_input = String::new();
+                            error_start = Some(Instant::now());
                             return;
                         }
 
@@ -339,7 +350,6 @@ fn main() {
                     }
                 }
                 MenuItem::Log => {
-                    footer_txt = default_footer_txt.clone();
                     let home = Paragraph::new(vec![
                         Spans::from(vec![Span::raw("")]),
                         Spans::from(vec![Span::raw("The Logs feature is not currently implemented!")]),
@@ -372,19 +382,11 @@ fn main() {
                     chunks[2].y + 1,
                 );
                 rect.render_widget(input, chunks[2]);
-
-                if input_ready {
-
-                    // todo: use the input
-
-                    input_ready = false;
-                    user_input = String::new();
-                }
-                input_mode_prompt = format!("Input");
-            } else {
-                rect.render_widget(footer, chunks[2]);
-                input_mode = false;
             }
+            if !input_mode {
+                rect.render_widget(footer, chunks[2]);
+            }
+            input_mode_prompt = format!("Input");
         }).expect("Failed to draw frame with TUI");
 
         // handle keypresses for the UI
@@ -395,9 +397,6 @@ fn main() {
                 }
                 if input_mode {
                     match event.code {
-                        KeyCode::Char('?') => {
-                            input_mode = false;
-                        }
                         KeyCode::Char(c) => {
                             user_input.push(c);
                         }
@@ -418,12 +417,18 @@ fn main() {
                 } else {
                     match event.code {
                         KeyCode::Char('q') => break,
-                        KeyCode::Char('h') => active_menu_item = MenuItem::Home,
-                        KeyCode::Char('b') => active_menu_item = MenuItem::Burts,
-                        KeyCode::Char('f') => {
+                        KeyCode::Char('h') => {
+                            active_menu_item = MenuItem::Home;
+                        },
+                        KeyCode::Char('b') => {
+                            active_menu_item = MenuItem::Burts;
+                        },
+                        KeyCode::Char('t') => {
                             input_mode = !input_mode;
                         }
-                        KeyCode::Char('l') => active_menu_item = MenuItem::Log,
+                        KeyCode::Char('l') => {
+                            active_menu_item = MenuItem::Log;
+                        },
                         KeyCode::Down => {
                             if let Some(selected) = burt_list_state.selected() {
                                 let amnt_burts = burt_gang.len();
@@ -449,6 +454,140 @@ fn main() {
                 }
             }
             Event::Tick => {}
+        }
+
+        // handle input
+        if input_ready {
+            if !user_input.is_empty() {
+                let mut cmd_args = user_input.split(" ").collect::<Vec<&str>>();
+                let cmd = cmd_args.remove(0);
+
+                match cmd.to_ascii_lowercase().as_str() {
+                    "change" => {
+                        if cmd_args.len() < 2 {
+                            footer_txt = format!("change takes a variable name and a new value!");
+                            footer_col = Color::LightRed;
+                            error_start = Some(Instant::now());
+                            input_ready = false;
+                            user_input = String::new();
+                            continue;
+                        }
+
+                        let var = cmd_args.get(0).unwrap();
+                        let value = cmd_args.get(1).unwrap();
+
+                        match *var {
+                            "range" => {
+                                let parsed = value.parse::<u32>();
+                                if parsed.is_err() {
+                                    footer_txt = format!("Invalid value: range expects a value above 0!");
+                                    footer_col = Color::LightRed;
+                                    error_start = Some(Instant::now());
+                                    input_ready = false;
+                                    user_input = String::new();
+                                    continue;
+                                }
+                                let n = parsed.unwrap();
+                                burt_gang.range = n;
+                            }
+                            "target" => {
+                                let parsed = value.parse::<u32>();
+                                if parsed.is_err() {
+                                    footer_txt = format!("Invalid value: target expects a value above 0!");
+                                    footer_col = Color::LightRed;
+                                    error_start = Some(Instant::now());
+                                    input_ready = false;
+                                    user_input = String::new();
+                                    continue;
+                                }
+                                let n = parsed.unwrap();
+                                burt_gang.target = n;
+                            }
+                            "generations" => {
+                                let parsed = value.parse::<u32>();
+                                if parsed.is_err() {
+                                    footer_txt = format!("Invalid value: generations expects a value above 0!");
+                                    footer_col = Color::LightRed;
+                                    error_start = Some(Instant::now());
+                                    input_ready = false;
+                                    user_input = String::new();
+                                    continue;
+                                }
+                                let n = parsed.unwrap();
+
+                                burt_gang.generations = n;
+                            }
+                            "survival_rate" => {
+                                let decimal = value.parse::<f32>();
+                                if decimal.is_err() {
+                                    footer_txt = format!("Invalid value: survival_rate expects a value between 0 and 1!");
+                                    footer_col = Color::LightRed;
+                                    error_start = Some(Instant::now());
+                                    input_ready = false;
+                                    user_input = String::new();
+                                    continue;
+                                }
+                                let n = decimal.unwrap();
+                                if n < 0.0 || n >= 1.0 {
+                                    footer_txt = format!("Invalid value: survival_rate expects a value between 0 and 1!");
+                                    footer_col = Color::LightRed;
+                                    error_start = Some(Instant::now());
+                                    input_ready = false;
+                                    user_input = String::new();
+                                    continue;
+                                }
+                                burt_gang.survival_rate = n;
+                            }
+                            "mutation_rate" => {
+                                let decimal = value.parse::<f32>();
+                                if decimal.is_err() {
+                                    footer_txt = format!("Invalid value: mutation_rate expects a value between 0 and 1!");
+                                    footer_col = Color::LightRed;
+                                    error_start = Some(Instant::now());
+                                    input_ready = false;
+                                    user_input = String::new();
+                                    continue;
+                                }
+                                let n = decimal.unwrap();
+                                if n < 0.0 || n >= 1.0 {
+                                    footer_txt = format!("Invalid value: mutation_rate expects a value between 0 and 1!");
+                                    footer_col = Color::LightRed;
+                                    error_start = Some(Instant::now());
+                                    input_ready = false;
+                                    user_input = String::new();
+                                    continue;
+                                }
+                                burt_gang.mutation_rate = n;
+                            }
+                            _ => {
+                                footer_txt = format!("Invalid variable!");
+                                footer_col = Color::LightRed;
+                                error_start = Some(Instant::now());
+                                input_ready = false;
+                                user_input = String::new();
+                                continue;
+                            }
+                        }
+                    }
+                    _ => {
+                        footer_txt = format!("Invalid Command!");
+                        footer_col = Color::LightRed;
+                        error_start = Some(Instant::now());
+                    }
+                }
+            }
+
+            input_ready = false;
+            user_input = String::new();
+        }
+
+        if error_start.is_some() {
+            let start = error_start.unwrap();
+            if start.elapsed() >= error_time {
+                error_start = None;
+                footer_txt = default_footer_txt.clone();
+                footer_col = default_footer_col.clone();
+            }
         }
 
     }
