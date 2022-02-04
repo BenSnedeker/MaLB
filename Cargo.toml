@@ -1,5 +1,5 @@
 [package]
-name = "MaL"
+name = "malb"
 version = "0.1.0"
 edition = "2021"
 authors = ["Ben", "Eric"]
