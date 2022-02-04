@@ -85,5 +85,5 @@ fn main() {
 
         print!("\r{}[{}{}{}] {}{}{}%", default_color, completed_bar, uncompleted_bar, default_color, color, percent, default_color);
     }
-    println!("\n{} Burts populated!", burt_count);
+    println!("\n{} Burtus populated!", burt_count);
 }
