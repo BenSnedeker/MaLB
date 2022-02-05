@@ -6,12 +6,14 @@ use crossterm::{event, execute, terminal};
 use crossterm::cursor::MoveTo;
 use crossterm::terminal::{ClearType, disable_raw_mode, enable_raw_mode};
 use crossterm::event::{Event as CEvent, KeyCode};
+use log::{info, LevelFilter, warn};
 use tui::backend::CrosstermBackend;
 use tui::layout::{Alignment, Constraint, Direction, Layout};
 use tui::style::{Color, Modifier, Style};
 use tui::Terminal;
 use tui::text::{Span, Spans};
 use tui::widgets::{Block, Borders, BorderType, List, ListItem, ListState, Paragraph, Row, Table, Tabs};
+use tui_logger::{init_logger, set_default_level, TuiLoggerLevelOutput, TuiLoggerSmartWidget, TuiWidgetState};
 use crate::burt::{BurtGang, get_burt_gang, populate_burts};
 use crate::ui::{Event, MenuItem};
 
@@ -37,6 +39,11 @@ fn main() {
     println!("{}", &burt_gang);
 
     thread::sleep(Duration::from_millis(3000));
+
+    // initialize logger
+    init_logger(LevelFilter::Trace).unwrap();
+    set_default_level(LevelFilter::Trace);
+    info!(target:"MaLB", "Starting renderer");
 
     // enable terminal raw mode and set up the terminal
     enable_raw_mode().expect("Failed to enable raw mode; is this terminal supported?");
@@ -350,20 +357,17 @@ fn main() {
                     }
                 }
                 MenuItem::Log => {
-                    let home = Paragraph::new(vec![
-                        Spans::from(vec![Span::raw("")]),
-                        Spans::from(vec![Span::raw("The Logs feature is not currently implemented!")]),
-                        Spans::from(vec![Span::raw("")]),
-                    ])
-                        .alignment(Alignment::Center)
-                        .block(
-                            Block::default()
-                                .borders(Borders::ALL)
-                                .style(Style::default().fg(Color::White))
-                                .title("Home")
-                                .border_type(BorderType::Plain),
-                        );
-                    rect.render_widget(home, chunks[1]);
+                    let tui_sm = TuiLoggerSmartWidget::default()
+                        .style_error(Style::default().fg(Color::Red))
+                        .style_debug(Style::default().fg(Color::Green))
+                        .style_warn(Style::default().fg(Color::Yellow))
+                        .style_trace(Style::default().fg(Color::Magenta))
+                        .style_info(Style::default().fg(Color::Cyan))
+                        .output_separator(": ".to_string())
+                        .output_timestamp(Some("%H:%M:%S ".to_string()))
+                        .output_level(Some(TuiLoggerLevelOutput::Abbreviated))
+                        .output_target(true);
+                    rect.render_widget(tui_sm, chunks[1]);
                 }
             }
 
@@ -430,6 +434,9 @@ fn main() {
                             }
                             KeyCode::Char('l') => {
                                 active_menu_item = MenuItem::Log;
+                            },
+                            KeyCode::Char('e') => {
+                                warn!(target:"MaLB_EventHandler", "The 'e' key was pressed!");
                             },
                             KeyCode::Down => {
                                 if let Some(selected) = burt_list_state.selected() {
