@@ -366,6 +366,8 @@ fn main() {
                         .output_separator(": ".to_string())
                         .output_timestamp(Some("%H:%M:%S ".to_string()))
                         .output_level(Some(TuiLoggerLevelOutput::Abbreviated))
+                        .output_file(false)
+                        .output_line(false)
                         .output_target(true);
                     rect.render_widget(tui_sm, chunks[1]);
                 }
