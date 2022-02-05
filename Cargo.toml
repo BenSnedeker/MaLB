@@ -9,4 +9,4 @@ rand = "*"
 crossterm = "*"
 better_term = "*"
 pbars = "*"
-tui = "*"
+tui = { version="0.17.0", default-features=true }
