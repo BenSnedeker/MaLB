@@ -1,0 +1,24 @@
+[package]
+name = "tlogger"
+version = "0.6.6"
+authors = ["Jochen Kiemes <jochen@kiemes.de>"]
+edition = "2021"
+license = "MIT"
+description = "Logger with smart widget for the `tui` crate"
+documentation = "https://docs.rs/tui-logger/0.6.0/tui_logger/"
+repository = "https://github.com/gin66/tui-logger"
+readme = "README.md"
+keywords = ["tui", "log", "logger", "widget", "dispatcher"]
+
+[dependencies]
+log = "*"
+chrono = "0.4"
+tui = { version = "*", default-features = false }
+lazy_static = "1.0"
+fxhash = "0.2"
+parking_lot = "0"
+slog = "2.5"
+
+[dev-dependencies]
+tui = { version = "*", default-features = true }
+

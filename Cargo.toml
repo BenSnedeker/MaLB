@@ -11,4 +11,4 @@ better_term = "*"
 pbars = "*"
 tui = { version = "0.17.0", default-features = true }
 log = "*"
-tui-logger = { path = "./tui-logger" }
+tlogger = { path = "./tlogger" }
