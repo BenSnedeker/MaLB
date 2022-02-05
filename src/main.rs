@@ -390,7 +390,7 @@ fn main() {
         }).expect("Failed to draw frame with TUI");
 
         // handle keypresses for the UI
-        let event_poll = rx.recv_timeout(Duration::from_millis(1000));
+        let event_poll = rx.recv_timeout(Duration::from_millis(200));
         if event_poll.is_ok() {
             match event_poll.unwrap() {
                 Event::Input(event) => {
