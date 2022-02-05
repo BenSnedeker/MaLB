@@ -390,74 +390,78 @@ fn main() {
         }).expect("Failed to draw frame with TUI");
 
         // handle keypresses for the UI
-        match rx.recv().expect("Failed to receive keypress") {
-            Event::Input(event) => {
-                if event.code == KeyCode::Char('`') {
-                    break;
-                }
-                if input_mode {
-                    match event.code {
-                        KeyCode::Char(c) => {
-                            user_input.push(c);
-                        }
-                        KeyCode::Enter => {
-                            input_ready = true;
-                            input_mode = !input_mode;
-                        }
-                        KeyCode::Esc => {
-                            input_mode = !input_mode;
-                        }
-                        KeyCode::Backspace => {
-                            if user_input.len() > 0 {
-                                user_input.remove(user_input.len() - 1);
-                            }
-                        }
-                        _ => {}
+        let event_poll = rx.recv_timeout(Duration::from_millis(1000));
+        if event_poll.is_ok() {
+            match event_poll.unwrap() {
+                Event::Input(event) => {
+                    if event.code == KeyCode::Char('`') {
+                        break;
                     }
-                } else {
-                    match event.code {
-                        KeyCode::Char('q') => break,
-                        KeyCode::Char('h') => {
-                            active_menu_item = MenuItem::Home;
-                        },
-                        KeyCode::Char('b') => {
-                            active_menu_item = MenuItem::Burts;
-                        },
-                        KeyCode::Char('t') => {
-                            input_mode = !input_mode;
-                        }
-                        KeyCode::Char('l') => {
-                            active_menu_item = MenuItem::Log;
-                        },
-                        KeyCode::Down => {
-                            if let Some(selected) = burt_list_state.selected() {
-                                let amnt_burts = burt_gang.len();
-                                if selected >= amnt_burts - 1 {
-                                    burt_list_state.select(Some(0));
-                                } else {
-                                    burt_list_state.select(Some(selected + 1));
+                    if input_mode {
+                        match event.code {
+                            KeyCode::Char(c) => {
+                                user_input.push(c);
+                            }
+                            KeyCode::Enter => {
+                                input_ready = true;
+                                input_mode = !input_mode;
+                            }
+                            KeyCode::Esc => {
+                                input_mode = !input_mode;
+                            }
+                            KeyCode::Backspace => {
+                                if user_input.len() > 0 {
+                                    user_input.remove(user_input.len() - 1);
                                 }
                             }
+                            _ => {}
                         }
-                        KeyCode::Up => {
-                            if let Some(selected) = burt_list_state.selected() {
-                                let amnt_burts = burt_gang.len();
-                                if selected > 0 {
-                                    burt_list_state.select(Some(selected - 1));
-                                } else {
-                                    burt_list_state.select(Some(amnt_burts - 1));
+                    } else {
+                        match event.code {
+                            KeyCode::Char('q') => break,
+                            KeyCode::Char('h') => {
+                                active_menu_item = MenuItem::Home;
+                            },
+                            KeyCode::Char('b') => {
+                                active_menu_item = MenuItem::Burts;
+                            },
+                            KeyCode::Char('t') => {
+                                input_mode = !input_mode;
+                            }
+                            KeyCode::Char('l') => {
+                                active_menu_item = MenuItem::Log;
+                            },
+                            KeyCode::Down => {
+                                if let Some(selected) = burt_list_state.selected() {
+                                    let amnt_burts = burt_gang.len();
+                                    if selected >= amnt_burts - 1 {
+                                        burt_list_state.select(Some(0));
+                                    } else {
+                                        burt_list_state.select(Some(selected + 1));
+                                    }
                                 }
                             }
+                            KeyCode::Up => {
+                                if let Some(selected) = burt_list_state.selected() {
+                                    let amnt_burts = burt_gang.len();
+                                    if selected > 0 {
+                                        burt_list_state.select(Some(selected - 1));
+                                    } else {
+                                        burt_list_state.select(Some(amnt_burts - 1));
+                                    }
+                                }
+                            }
+                            _ => {}
                         }
-                        _ => {}
                     }
                 }
+                Event::Tick => {}
             }
-            Event::Tick => {}
         }
 
         // handle input
-        if input_ready {
+        let burt_list_mode = if let MenuItem::Burts = active_menu_item { true } else { false };
+        if input_ready && !burt_list_mode {
             if !user_input.is_empty() {
                 let mut cmd_args = user_input.split(" ").collect::<Vec<&str>>();
                 let cmd = cmd_args.remove(0);
