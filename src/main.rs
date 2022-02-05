@@ -13,7 +13,7 @@ use tui::style::{Color, Modifier, Style};
 use tui::Terminal;
 use tui::text::{Span, Spans};
 use tui::widgets::{Block, Borders, BorderType, List, ListItem, ListState, Paragraph, Row, Table, Tabs};
-use tlogger::{init_logger, set_default_level, TuiLoggerLevelOutput, TuiLoggerSmartWidget, TuiWidgetState};
+use tlogger::{init_logger, set_default_level, TuiLoggerLevelOutput, TuiLoggerSmartWidget};
 use crate::burt::{BurtGang, get_burt_gang, populate_burts};
 use crate::ui::{Event, MenuItem};
 
