@@ -6,23 +6,22 @@ use crossterm::{event, execute, terminal};
 use crossterm::cursor::MoveTo;
 use crossterm::terminal::{ClearType, disable_raw_mode, enable_raw_mode};
 use crossterm::event::{Event as CEvent, KeyCode};
-use log::{info, LevelFilter, warn};
+use log::{info, LevelFilter};
 use tui::backend::CrosstermBackend;
 use tui::layout::{Alignment, Constraint, Direction, Layout};
 use tui::style::{Color, Modifier, Style};
 use tui::Terminal;
 use tui::text::{Span, Spans};
-use tui::widgets::{Block, Borders, BorderType, List, ListItem, ListState, Paragraph, Row, Table, Tabs};
+use tui::widgets::{Block, Borders, BorderType, ListState, Paragraph, Tabs};
 use tlogger::{init_logger, set_default_level, TuiLoggerLevelOutput, TuiLoggerSmartWidget};
 use crate::burt::{BurtGang, get_burt_gang, populate_burts};
-use crate::ui::{Event, MenuItem};
+use crate::ui::{draw_burts, draw_home, Event, MenuItem};
 
 pub(crate) mod input;
 mod ui;
 mod burt;
 
 fn main() {
-
     // get arguments
     let args: Vec<String> = env::args().collect();
 
@@ -31,7 +30,8 @@ fn main() {
 
     // initialize the burts
     let mut burt_gang = if args.contains(&"-d".to_string()) || args.contains(&"--default".to_string()) {
-        BurtGang::new(populate_burts(10000), 100, 7, 150, 0.5, 0.25)
+        let default_range = 100;
+        BurtGang::new(populate_burts(10000, default_range.clone()), default_range, 7, 150, 0.5, 0.25)
     } else {
         get_burt_gang()
     };
@@ -109,7 +109,7 @@ fn main() {
                     .title("Info")
                     .border_type(BorderType::Plain)
             );
-        terminal.draw(|rect| {
+        terminal.draw(|mut rect| {
             // setup the layout
             let size = rect.size();
             let chunks = Layout::default()
@@ -150,167 +150,10 @@ fn main() {
             // handle the main page
             match active_menu_item {
                 MenuItem::Home => {
-                    let home_chunks = Layout::default()
-                        .direction(Direction::Vertical)
-                        .constraints(
-                            [Constraint::Percentage(70), Constraint::Percentage(30)].as_ref(),
-                        )
-                        .split(chunks[1]);
-
-                    let home = Paragraph::new(vec![
-                        Spans::from(vec![Span::raw("")]),
-                        Spans::from(vec![Span::raw("Welcome")]),
-                        Spans::from(vec![Span::raw("")]),
-                        Spans::from(vec![Span::raw("to")]),
-                        Spans::from(vec![Span::raw("")]),
-                        Spans::from(vec![Span::styled(
-                            "MaLB",
-                            Style::default().fg(Color::LightYellow),
-                        )]),
-                        Spans::from(vec![Span::raw("")]),
-                        Spans::from(vec![Span::raw("Press 'h' for Home, 'b' for Burts, 'l' for Logs, 't' to run a command, and 'q' for Quit")]),
-                    ])
-                        .alignment(Alignment::Center)
-                        .block(
-                            Block::default()
-                                .borders(Borders::ALL)
-                                .style(Style::default().fg(Color::White))
-                                .title("Home")
-                                .border_type(BorderType::Plain),
-                        );
-
-                    let home_details = Table::new(vec![Row::new(vec![
-                        Span::raw(format!("{}", burt_gang.target)), // target
-                        Span::raw(format!("{}", burt_gang.range)), // range
-                        Span::raw(format!("{} / {}", burt_gang.current_generation, burt_gang.generations)), // generation
-                        Span::raw(format!("{}", burt_gang.survival_rate)), // survival rate
-                        Span::raw(format!("{}", burt_gang.mutation_rate)), // mutation rate
-                        Span::raw(format!("{}", burt_gang.len())), // burt count
-                    ])])
-                        .header(Row::new(vec![
-                            Span::styled(
-                                "Target",
-                                Style::default().add_modifier(Modifier::BOLD),
-                            ),
-                            Span::styled(
-                                "Range",
-                                Style::default().add_modifier(Modifier::BOLD),
-                            ),
-                            Span::styled(
-                                "Generation",
-                                Style::default().add_modifier(Modifier::BOLD),
-                            ),
-                            Span::styled(
-                                "Survival Rate",
-                                Style::default().add_modifier(Modifier::BOLD),
-                            ),
-                            Span::styled(
-                                "Mutation Rate",
-                                Style::default().add_modifier(Modifier::BOLD),
-                            ),
-                            Span::styled(
-                                "Burt Count",
-                                Style::default().add_modifier(Modifier::BOLD),
-                            ),
-                        ]))
-                        .block(
-                            Block::default()
-                                .borders(Borders::ALL)
-                                .style(Style::default().fg(Color::White))
-                                .title("Details")
-                                .border_type(BorderType::Plain),
-                        )
-                        .widths(&[
-                            Constraint::Percentage(10),
-                            Constraint::Percentage(10),
-                            Constraint::Percentage(10),
-                            Constraint::Percentage(10),
-                            Constraint::Percentage(10),
-                            Constraint::Percentage(10),
-                        ]);
-                    rect.render_widget(home, home_chunks[0]);
-                    rect.render_widget(home_details, home_chunks[1]);
+                    draw_home(&mut rect, &chunks, &mut burt_gang);
                 }
                 MenuItem::Burts => {
-                    let burts_chunks = Layout::default()
-                        .direction(Direction::Horizontal)
-                        .constraints(
-                            [Constraint::Percentage(20), Constraint::Percentage(80)].as_ref(),
-                        )
-                        .split(chunks[1]);
-                    let burts = Block::default()
-                        .borders(Borders::ALL)
-                        .style(Style::default().fg(Color::White))
-                        .title("Burts")
-                        .border_type(BorderType::Plain);
-
-                    let burt_list = &burt_gang;
-                    let items: Vec<_> = burt_list
-                        .iter()
-                        .map(|burt| {
-                            ListItem::new(Spans::from(vec![Span::styled(
-                                format!("Burt #{}", burt.get_id().clone()),
-                                Style::default(),
-                            )]))
-                        })
-                        .collect();
-
-                    let selected_burt = burt_list
-                        .get(
-                            burt_list_state
-                                .selected()
-                                .expect("there is always a selected burt"),
-                        )
-                        .clone();
-
-                    let burts_list_left = List::new(items).block(burts).highlight_style(
-                        Style::default()
-                            .bg(Color::Yellow)
-                            .fg(Color::Black)
-                            .add_modifier(Modifier::BOLD),
-                    );
-
-                    let burt_detail = Table::new(vec![
-                        Row::new(vec![
-                        //Span::raw(format!("Burt #{}", selected_burt.get_id())), // id
-                        Span::raw("?".to_string()), // score
-                        Span::raw("?".to_string()), // guess
-                        Span::raw("?".to_string()), // mu
-                        Span::raw("?".to_string()), // sigma
-                    ])])
-                        .header(Row::new(vec![
-                            Span::styled(
-                                "Score",
-                                Style::default().add_modifier(Modifier::BOLD),
-                            ),
-                            Span::styled(
-                                "Guess",
-                                Style::default().add_modifier(Modifier::BOLD),
-                            ),
-                            Span::styled(
-                                "Mu",
-                                Style::default().add_modifier(Modifier::BOLD),
-                            ),
-                            Span::styled(
-                                "Sigma",
-                                Style::default().add_modifier(Modifier::BOLD),
-                            ),
-                        ]))
-                        .block(
-                            Block::default()
-                                .borders(Borders::ALL)
-                                .style(Style::default().fg(Color::White))
-                                .title(format!("Burt #{}", selected_burt.get_id()))
-                                .border_type(BorderType::Plain),
-                        )
-                        .widths(&[
-                            Constraint::Percentage(10),
-                            Constraint::Percentage(20),
-                            Constraint::Percentage(5),
-                            Constraint::Percentage(20),
-                        ]);
-                    rect.render_stateful_widget(burts_list_left, burts_chunks[0], &mut burt_list_state);
-                    rect.render_widget(burt_detail, burts_chunks[1]);
+                    draw_burts(&mut rect, &chunks, &burt_gang, &mut burt_list_state);
 
                     if input_mode {
                         input_mode_prompt = format!("Enter a Burt ID");
@@ -438,7 +281,8 @@ fn main() {
                                 active_menu_item = MenuItem::Log;
                             },
                             KeyCode::Char('e') => {
-                                warn!(target:"MaLB_EventHandler", "The 'e' key was pressed!");
+                                info!(target:"MalB", "User forced an interrogation");
+                                burt_gang.interrogate();
                             },
                             KeyCode::Down => {
                                 if let Some(selected) = burt_list_state.selected() {

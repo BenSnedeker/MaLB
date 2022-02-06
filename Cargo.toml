@@ -12,3 +12,4 @@ pbars = "*"
 tui = { version = "0.17.0", default-features = true }
 log = "*"
 tlogger = { path = "./tlogger" }
+rand_distr = "*"

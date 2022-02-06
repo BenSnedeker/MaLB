@@ -1,21 +1,79 @@
 use std::fmt::{Display, Formatter};
 use better_term::{Color, flush_styles};
 use pbars::{BarType, hide_cursor, PBar, show_cursor};
+use rand::{Rng, thread_rng};
+use rand_distr::{Normal, Distribution};
 use crate::input::{get_decimal, get_num, prompt};
 
+fn distance_from(target: u32, guess: u32) -> u32 {
+    if target == guess {
+        0
+    } else if target > guess {
+        target - guess
+    } else {
+        guess - target
+    }
+}
+
 pub struct Burt {
-    id: u32
+    id: u32,
+
+    score: Option<u32>,
+    guess: Option<u32>,
+
+    mu: f32,    // aka the mean
+    sigma: f32, // aka standard deviation
 }
 
 impl Burt {
-    pub fn new(id: u32) -> Self {
+    pub fn new(id: u32, range: u32) -> Self {
         Self {
             id,
+
+            score: None,
+            guess: None,
+
+            mu: thread_rng().gen_range(0.0..range as f32),
+            sigma: thread_rng().gen_range(0.0..range as f32),
         }
     }
 
     pub fn get_id(&self) -> u32 {
         self.id.clone()
+    }
+    pub fn get_mu(&self) -> f32 {
+        self.mu.clone()
+    }
+    pub fn get_sigma(&self) -> f32 {
+        self.sigma.clone()
+    }
+    pub fn get_score_display(&self) -> String {
+        format!("{}", if self.score.is_some() {
+            self.score.unwrap().to_string()
+        } else {
+            String::from("?")
+        })
+    }
+    pub fn get_guess_display(&self) -> String {
+        format!("{}", if self.guess.is_some() {
+            self.guess.unwrap().to_string()
+        } else {
+            String::from("?")
+        })
+    }
+
+    pub fn guess(&mut self, target: u32, range: u32) -> (u32, u32) {
+        let normal = Normal::new(self.mu, self.sigma)
+            .expect(format!("Failed to create normal for Burt #{}", self.id).as_str());
+        let mut guess: u32 = range + 1;
+        // todo(eric): this is so inefficient that it makes me sad. I need to make a better way of keeping it in bounds.. maybe .min().max()?
+        while guess > range {
+            guess = normal.sample(&mut thread_rng()) as u32;
+        }
+        self.guess = Some(guess);
+        self.score = Some(distance_from(target, guess));
+
+        (guess, self.score.unwrap().clone())
     }
 }
 
@@ -27,6 +85,9 @@ pub struct BurtGang {
     pub current_generation: u32,
     pub survival_rate: f32,
     pub mutation_rate: f32,
+
+    average_guess: Option<u32>,
+    average_score: Option<u32>,
 }
 
 impl BurtGang {
@@ -39,6 +100,9 @@ impl BurtGang {
             generations,
             survival_rate,
             mutation_rate,
+
+            average_guess: None,
+            average_score: None,
         }
     }
 
@@ -52,6 +116,39 @@ impl BurtGang {
 
     pub fn len(&self) -> usize {
         self.burts.len()
+    }
+
+    pub fn interrogate(&mut self) {
+        let mut total_score: usize = 0;
+        let mut total_guess: usize = 0;
+        let mut runs: u32 = 0;
+        for b in &mut self.burts {
+            let (guess, score) = b.guess(self.target, self.range);
+            total_guess += guess as usize;
+            total_score += score as usize;
+            runs += 1;
+        }
+
+        self.average_guess = Some((total_guess / runs as usize) as u32);
+        self.average_score = Some((total_score / runs as usize) as u32);
+
+        // todo(eric): get the worst burts and mutate them
+    }
+
+    pub fn av_guess_display(&self) -> String {
+        format!("{}", if self.average_guess.is_some() {
+            format!("{}", self.average_guess.unwrap())
+        } else {
+            format!("?")
+        })
+    }
+
+    pub fn av_score_display(&self) -> String {
+        format!("{}", if self.average_score.is_some() {
+            format!("{}", self.average_score.unwrap())
+        } else {
+            format!("?")
+        })
     }
 }
 
@@ -68,7 +165,7 @@ impl Display for BurtGang {
         // printing out the values with style
         let lines = vec![
                          format!("Range:         {}", self.range),
-                         format!("Target:        {}", self.range),
+                         format!("Target:        {}", self.target),
                          format!("Generations:   {}", self.generations),
                          format!("Survival rate: {}", self.survival_rate),
                          format!("Mutation rate: {}", self.mutation_rate),
@@ -95,7 +192,7 @@ impl Display for BurtGang {
     }
 }
 
-pub fn populate_burts(burt_count: u32) -> Vec<Burt> {
+pub fn populate_burts(burt_count: u32, range: u32) -> Vec<Burt> {
     let mut burts = Vec::new();
     // print the progress bar and begin populating Burts
     println!("Populating Burts...");
@@ -105,7 +202,7 @@ pub fn populate_burts(burt_count: u32) -> Vec<Burt> {
     // make each new burt with x being their id, and update the progress bar
     for x in 0..burt_count {
         // push the new burt into the vector
-        burts.push(Burt::new(x));
+        burts.push(Burt::new(x, range.clone()));
 
         // get the percentage of completion
         let percent = x as f64 / (burt_count - 1) as f64;
@@ -243,5 +340,5 @@ pub fn get_burt_gang() -> BurtGang {
         break;
     }
 
-    BurtGang::new(populate_burts(burt_count), range, target, generations, survival_rate, mutation_rate)
+    BurtGang::new(populate_burts(burt_count, range.clone()), range, target, generations, survival_rate, mutation_rate)
 }
