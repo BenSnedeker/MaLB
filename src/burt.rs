@@ -15,6 +15,7 @@ fn distance_from(target: u32, guess: u32) -> u32 {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Burt {
     id: u32,
 
@@ -75,6 +76,42 @@ impl Burt {
 
         (guess, self.score.unwrap().clone())
     }
+
+    pub fn reeducate(&mut self, mu: f32, sigma: f32) {
+        // todo(eric): maybe average these out with the current mu and sigma?
+        self.mu = mu;
+        self.sigma = sigma;
+    }
+
+    pub fn mutate(&mut self, mutation_rate: f32, range: u32) {
+        let mu_mut_amt = thread_rng().gen_range(0.0..mutation_rate);
+        // mu
+        if thread_rng().gen_bool(0.5) {
+            self.mu += mu_mut_amt;
+            if self.mu > range as f32 {
+                self.mu = range as f32;
+            }
+        } else {
+            self.mu -= mu_mut_amt;
+            if self.mu < 0.0 {
+                self.mu = 0.0;
+            }
+        }
+
+        let sigma_mut_amt = thread_rng().gen_range(0.0..mutation_rate);
+        // sigma
+        if thread_rng().gen_bool(0.5) {
+            self.sigma += sigma_mut_amt;
+            if self.sigma > range as f32 {
+                self.sigma = range as f32;
+            }
+        } else {
+            self.sigma -= sigma_mut_amt;
+            if self.sigma < 0.0 {
+                self.sigma = 0.0;
+            }
+        }
+    }
 }
 
 pub struct BurtGang {
@@ -118,10 +155,16 @@ impl BurtGang {
         self.burts.len()
     }
 
-    pub fn interrogate(&mut self) {
+    pub fn run_generation(&mut self) {
+        // increase generation
+        self.current_generation += 1;
+
+        // store variables for averages
         let mut total_score: usize = 0;
         let mut total_guess: usize = 0;
         let mut runs: u32 = 0;
+
+        // loop through the burts and have them guess
         for b in &mut self.burts {
             let (guess, score) = b.guess(self.target, self.range);
             total_guess += guess as usize;
@@ -129,10 +172,93 @@ impl BurtGang {
             runs += 1;
         }
 
+        // set the averages
         self.average_guess = Some((total_guess / runs as usize) as u32);
         self.average_score = Some((total_score / runs as usize) as u32);
 
         // todo(eric): get the worst burts and mutate them
+
+        // sort the burts into [0] best -> [len() - 1] worst
+        let mut sorted_burts: Vec<Burt> = Vec::new();
+
+        // loop through the burts
+        // worst case this will loop through all Burts twice :/ (can be in the thousands if not millions)
+        while !self.burts.is_empty() {
+            // get the current burt
+            let b = self.burts.remove(0);
+            let mut placed = false;
+            // loop through the sorted burts
+            for x in 0..sorted_burts.len() {
+                // get the current sorted burt (sb)
+                let sb = sorted_burts.get(x).unwrap();
+                // if the current burt has a better or equal score
+                if (&b).score.unwrap() <= sb.score.unwrap() {
+                    // place the burt in the sorted burts list at the location
+                    sorted_burts.insert(x, b.clone());
+                    placed = true;
+                    // break the loop
+                    break;
+                }
+            }
+            // if it hasn't been placed
+            // push the burt at the end (its a bad burt )
+            if !placed {
+                sorted_burts.push(b);
+            }
+        }
+
+        // with the sorted burt list, "re-educate" the lesser Burts
+        let survival_amt = (sorted_burts.len() as f32 * self.survival_rate) as u32;
+        // split sorted_burts into 2 vectors:
+        // original (sorted_burts) - contains the burts that survived
+        // bad_burts               - contains the burts that need to be re-educated
+        let mut bad_burts = sorted_burts.split_off(survival_amt as usize);
+
+        // go through and un-sort the burts
+        let mut new_burts: Vec<Burt> = Vec::new();
+        while !bad_burts.is_empty() {
+            let mut current = bad_burts.remove(0);
+
+            // re-educate and mutate the current
+            let teacher = sorted_burts.get(thread_rng().gen_range(0..sorted_burts.len())).unwrap();
+            let new_mu = teacher.mu.clone();
+            let new_sigma = teacher.sigma.clone();
+            current.reeducate(new_mu, new_sigma);
+            current.mutate(self.mutation_rate, self.range);
+
+            let mut placed = false;
+            for x in 0..new_burts.len() {
+                let b = new_burts.get(x).unwrap();
+                if current.id < b.id {
+                    new_burts.insert(x, current.clone());
+                    placed = true;
+                    break;
+                }
+            }
+            if !placed {
+                new_burts.push(current);
+            }
+        }
+
+        while !sorted_burts.is_empty() {
+            let current = sorted_burts.remove(0);
+            // mutate the current
+            //current.mutate(self.mutation_rate, self.range);
+
+            let mut placed = false;
+            for x in 0..new_burts.len() {
+                let b = new_burts.get(x).unwrap();
+                if current.id < b.id {
+                    new_burts.insert(x, current.clone());
+                    placed = true;
+                    break;
+                }
+            }
+            if !placed {
+                new_burts.push(current);
+            }
+        }
+        self.burts = new_burts;
     }
 
     pub fn av_guess_display(&self) -> String {
@@ -328,6 +454,14 @@ pub fn get_burt_gang() -> BurtGang {
             continue;
         }
         burt_count = input.unwrap();
+
+        // can't process with less than 1 burt
+        if burt_count == 0 {
+            println!("{}Warning: There has to be at least 1 burt!", Color::Yellow);
+            flush_styles();
+            continue;
+        }
+
         // if the burt count is greater than 100k warn the user about high memory and cpu usage
         if burt_count > 100000 {
             println!("{}Warning: You have entered a very high burt count! This can use large amounts of CPU and Memory (RAM).", Color::Yellow);

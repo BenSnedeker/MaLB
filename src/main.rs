@@ -31,7 +31,10 @@ fn main() {
     // initialize the burts
     let mut burt_gang = if args.contains(&"-d".to_string()) || args.contains(&"--default".to_string()) {
         let default_range = 100;
-        BurtGang::new(populate_burts(10000, default_range.clone()), default_range, 7, 150, 0.5, 0.25)
+        BurtGang::new(populate_burts(150,
+                                     default_range.clone()),
+                      default_range, 7, 150,
+                      0.5, 0.25)
     } else {
         get_burt_gang()
     };
@@ -282,7 +285,7 @@ fn main() {
                             },
                             KeyCode::Char('e') => {
                                 info!(target:"MalB", "User forced an interrogation");
-                                burt_gang.interrogate();
+                                burt_gang.run_generation();
                             },
                             KeyCode::Down => {
                                 if let Some(selected) = burt_list_state.selected() {
