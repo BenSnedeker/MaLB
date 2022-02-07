@@ -41,9 +41,7 @@ fn main() {
         get_burt_gang()
     };
 
-    println!("{}", &burt_gang);
-
-    thread::sleep(Duration::from_millis(3000));
+    //println!("{}", &burt_gang);
 
     // initialize logger
     init_logger(LevelFilter::Trace).unwrap();
