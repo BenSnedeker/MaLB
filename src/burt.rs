@@ -265,6 +265,11 @@ impl BurtGang {
         self.burts = new_burts;
     }
 
+    pub fn save_best_average(&self) {
+        // todo(eric): Write the best of the average mu's and sigma's to a file along with the guess
+        //  i.e. in "target:{target},mu:{average_mu},sigma:{average_sigma}"
+    }
+
     pub fn av_guess_display(&self) -> String {
         format!("{}", if self.average_guess.is_some() {
             format!("{}", self.average_guess.unwrap())
