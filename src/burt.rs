@@ -64,6 +64,7 @@ impl Burt {
     }
 
     pub fn guess(&mut self, target: u32, range: u32) -> (u32, u32) {
+        // normal distribution
         let normal = Normal::new(self.mu, self.sigma)
             .expect(format!("Failed to create normal for Burt #{}", self.id).as_str());
         let mut guess: u32 = range + 1;
@@ -84,7 +85,7 @@ impl Burt {
     }
 
     pub fn mutate(&mut self, mutation_rate: f32, range: u32) {
-        let mu_mut_amt = thread_rng().gen_range(0.0..mutation_rate);
+        let mu_mut_amt = thread_rng().gen_range(0.0..((range as f32) * mutation_rate));
         // mu
         if thread_rng().gen_bool(0.5) {
             self.mu += mu_mut_amt;
