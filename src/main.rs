@@ -285,7 +285,7 @@ fn main() {
                             },
                             KeyCode::Char('e') => {
                                 info!(target:"MalB", "User forced an interrogation");
-                                burt_gang.run_generation();
+                                burt_gang.train();
                             },
                             KeyCode::Down => {
                                 if let Some(selected) = burt_list_state.selected() {

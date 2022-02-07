@@ -58,10 +58,14 @@ impl Burt {
     }
 
     pub fn training_think(&mut self, target: u32, range: u32) -> (u32, u32) {
+        // get the output of the think function with the number 1.0
         let output = self.think(1.0, range as f32) as u32;
+        // get the distance to target as the score
         let score = distance_from(target, output);
+        // store the score and guess
         self.score = Some(score.clone());
         self.guess = Some(output);
+        // return those values for the training system to use
         (output, score)
     }
 
@@ -69,11 +73,13 @@ impl Burt {
         // normal distribution
         let normal = Normal::new(self.mu, self.sigma)
             .expect(format!("Failed to create normal for Burt #{}", self.id).as_str());
+        // get the number in the range (super inefficient, todo(eric): rework getting a number in a range)
         let mut number = range + 1.0;
         while number > range {
             number = normal.sample(&mut thread_rng());
         }
 
+        // return the number * input
         input * number
     }
 
@@ -156,7 +162,13 @@ impl BurtGang {
         self.burts.len()
     }
 
-    pub fn run_generation(&mut self) {
+    pub fn train(&mut self) {
+
+        // todo(eric): Idea for training on multiple guesses to always guess the target with no mutation:
+        //    each round, set a new target. mutate the worst ones and keep the best ones.
+        //    repeat until the best ones always guess correctly
+        //    this might also require the changing of the input?
+
         // increase generation
         self.current_generation += 1;
 
@@ -176,8 +188,6 @@ impl BurtGang {
         // set the averages
         self.average_guess = Some((total_guess / runs as usize) as u32);
         self.average_score = Some((total_score / runs as usize) as u32);
-
-        // todo(eric): get the worst burts and mutate them
 
         // sort the burts into [0] best -> [len() - 1] worst
         let mut sorted_burts: Vec<Burt> = Vec::new();
