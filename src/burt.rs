@@ -6,13 +6,7 @@ use rand_distr::{Normal, Distribution};
 use crate::input::{get_decimal, get_num, prompt};
 
 fn distance_from(target: u32, guess: u32) -> u32 {
-    if target == guess {
-        0
-    } else if target > guess {
-        target - guess
-    } else {
-        guess - target
-    }
+    target.abs_diff(guess)
 }
 
 #[derive(Clone, Debug)]

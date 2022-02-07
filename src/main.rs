@@ -1,3 +1,5 @@
+#![feature(int_abs_diff)]
+
 use std::{env, thread};
 use std::io::stdout;
 use std::sync::mpsc;

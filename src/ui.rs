@@ -152,7 +152,7 @@ pub fn draw_burts(rect: &mut Frame<CrosstermBackend<Stdout>>, chunks: &Vec<Rect>
         .get(
             burt_list_state
                 .selected()
-                .expect("there is always a selected burt"),
+                .expect("This shouldn't be reachable, as there is always a selected burt!"),
         )
         .clone();
 
@@ -165,7 +165,7 @@ pub fn draw_burts(rect: &mut Frame<CrosstermBackend<Stdout>>, chunks: &Vec<Rect>
 
     let burt_detail = Table::new(vec![
         Row::new(vec![
-            //Span::raw(format!("Burt #{}", selected_burt.get_id())), // id
+            //Span::raw(format!("Burt #{}", selected_burt.get_id())), // id - moved to title
             Span::raw(format!("{}", selected_burt.get_score_display())), // score
             Span::raw(format!("{}", selected_burt.get_guess_display())), // guess
             Span::raw(format!("{}", selected_burt.get_mu())), // mu
