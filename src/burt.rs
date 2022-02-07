@@ -57,19 +57,12 @@ impl Burt {
         })
     }
 
-    pub fn training_guess(&mut self, target: u32, range: u32) -> (u32, u32) {
-        // normal distribution
-        let normal = Normal::new(self.mu, self.sigma)
-            .expect(format!("Failed to create normal for Burt #{}", self.id).as_str());
-        let mut guess: u32 = range + 1;
-        // todo(eric): this is so inefficient that it makes me sad. I need to make a better way of keeping it in bounds.. maybe .min().max()?
-        while guess > range {
-            guess = normal.sample(&mut thread_rng()) as u32;
-        }
-        self.guess = Some(guess);
-        self.score = Some(distance_from(target, guess));
-
-        (guess, self.score.unwrap().clone())
+    pub fn training_think(&mut self, target: u32, range: u32) -> (u32, u32) {
+        let output = self.think(1.0, range as f32) as u32;
+        let score = distance_from(target, output);
+        self.score = Some(score.clone());
+        self.guess = Some(output);
+        (output, score)
     }
 
     pub fn think(&mut self, input: f32, range: f32) -> f32 {
@@ -174,7 +167,7 @@ impl BurtGang {
 
         // loop through the burts and have them guess
         for b in &mut self.burts {
-            let (guess, score) = b.training_guess(self.target, self.range);
+            let (guess, score) = b.training_think(self.target, self.range);
             total_guess += guess as usize;
             total_score += score as usize;
             runs += 1;
