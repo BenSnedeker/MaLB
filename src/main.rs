@@ -41,6 +41,13 @@ fn main() {
         get_burt_gang()
     };
 
+    let starting_burt_count = burt_gang.burts.len() as u32;
+    let starting_range = burt_gang.range;
+    let starting_target = burt_gang.target;
+    let starting_survival_rate = burt_gang.survival_rate;
+    let starting_mutation_rate = burt_gang.mutation_rate;
+    let starting_generations = burt_gang.generations;
+
     //println!("{}", &burt_gang);
 
     // initialize logger
@@ -61,6 +68,7 @@ fn main() {
     let (tx, rx) = mpsc::channel();
     let tick_rate = Duration::from_millis(200);
 
+    // input handling thread
     thread::spawn(move || {
         let mut last_tick = Instant::now();
 
@@ -100,8 +108,13 @@ fn main() {
     let error_time = Duration::from_millis(3000);
     let mut error_start: Option<Instant> = None;
 
-    // start the render loop
+    let generation_delay = Duration::from_millis(0);
+
+    let mut last_gen_run: Option<Instant> = None;
+
+    // start the main loop
     loop {
+        // draw the UI
         let footer = Paragraph::new(footer_txt.clone())
             .style(Style::default().fg(footer_col))
             .alignment(Alignment::Center)
@@ -246,8 +259,12 @@ fn main() {
         if event_poll.is_ok() {
             match event_poll.unwrap() {
                 Event::Input(event) => {
-                    if event.code == KeyCode::Char('`') {
-                        break;
+                    if event.code == KeyCode::Char('c') {
+                        if event.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+                            // add ctrl+c functionality
+                            // if the program is processing for a long time this wont complete until it's done processing
+                            break;
+                        }
                     }
                     if input_mode {
                         match event.code {
@@ -271,6 +288,14 @@ fn main() {
                     } else {
                         match event.code {
                             KeyCode::Char('q') => break,
+                            KeyCode::Char('r') => {
+                                burt_gang = BurtGang::new(populate_burts(starting_burt_count.clone(),
+                                                                         starting_range.clone()),
+                                                          starting_range.clone(),
+                                                          starting_target.clone(), starting_generations.clone(),
+                                                          starting_survival_rate.clone(),
+                                                          starting_mutation_rate.clone())
+                            }
                             KeyCode::Char('h') => {
                                 active_menu_item = MenuItem::Home;
                             },
@@ -284,13 +309,13 @@ fn main() {
                                 active_menu_item = MenuItem::Log;
                             },
                             KeyCode::Char('e') => {
-                                info!(target:"MalB", "User forced an interrogation");
+                                info!(target:"MalB", "User forced run of training generation: {}/{}",
+                                    burt_gang.current_generation, burt_gang.generations);
                                 burt_gang.train();
                             },
                             KeyCode::Down => {
                                 if let Some(selected) = burt_list_state.selected() {
-                                    let amnt_burts = burt_gang.len();
-                                    if selected >= amnt_burts - 1 {
+                                    if selected >= burt_gang.len() - 1 {
                                         burt_list_state.select(Some(0));
                                     } else {
                                         burt_list_state.select(Some(selected + 1));
@@ -313,6 +338,21 @@ fn main() {
                 }
                 Event::Tick => {}
             }
+        }
+
+        // handle running training
+        if burt_gang.current_generation < burt_gang.generations {
+            if last_gen_run.is_some() {
+                if last_gen_run.unwrap().elapsed() >= generation_delay {
+                    burt_gang.train();
+                    last_gen_run = Some(Instant::now());
+                }
+            } else {
+                burt_gang.train();
+                last_gen_run = Some(Instant::now());
+            }
+        } else {
+            // training is complete, do something here
         }
 
         // handle input

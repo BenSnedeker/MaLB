@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 use better_term::{Color, flush_styles};
+use log::debug;
 use pbars::{BarType, hide_cursor, PBar, show_cursor};
 use rand::{Rng, thread_rng};
 use rand_distr::{Normal, Distribution};
@@ -162,6 +163,113 @@ impl BurtGang {
         self.burts.len()
     }
 
+    pub fn advanced_train(&mut self) {
+        self.current_generation += 1;
+
+        // store variables for averages
+        let mut total_score: usize = 0;
+        let mut total_guess: usize = 0;
+        let mut runs: u32 = 0;
+
+        // loop through the burts and have them guess
+        for b in &mut self.burts {
+            let (guess, score) = b.training_think(self.target, self.range);
+            total_guess += guess as usize;
+            total_score += score as usize;
+            runs += 1;
+        }
+
+        // set the averages
+        self.average_guess = Some((total_guess / runs as usize) as u32);
+        self.average_score = Some((total_score / runs as usize) as u32);
+
+        // sort the burts into [0] best -> [len() - 1] worst
+        let mut sorted_burts: Vec<Burt> = Vec::new();
+
+        // store the best burt
+        let mut best_set: Option<(u32, f32, f32)> = None;
+
+        // loop through the burts
+        // worst case this will loop through all Burts twice :/ (can be in the thousands if not millions)
+        while !self.burts.is_empty() {
+            // get the current burt
+            let b = self.burts.remove(0);
+
+            if let Some((score, _, _)) = best_set {
+                if score > b.score.unwrap() {
+                    best_set = Some((b.score.unwrap(), b.mu, b.sigma));
+                }
+            } else {
+                best_set = Some((b.score.unwrap(), b.mu, b.sigma));
+            }
+
+            let mut placed = false;
+            // loop through the sorted burts
+            for x in 0..sorted_burts.len() {
+                // get the current sorted burt (sb)
+                let sb = sorted_burts.get(x).unwrap();
+                // if the current burt has a better or equal score
+                if (&b).score.unwrap() <= sb.score.unwrap() {
+                    // place the burt in the sorted burts list at the location
+                    sorted_burts.insert(x, b.clone());
+                    placed = true;
+                    // break the loop
+                    break;
+                }
+            }
+            // if it hasn't been placed
+            // push the burt at the end (its a bad burt )
+            if !placed {
+                sorted_burts.push(b);
+            }
+        }
+
+        for b in &mut sorted_burts {
+            let (bscore, bmu, bsigma) = best_set.unwrap();
+            if b.score.unwrap() != bscore {
+                b.reeducate(bmu, bsigma);
+                if bscore != 0 {
+                    b.mutate(self.mutation_rate, self.range);
+                }
+            }
+        }
+
+        let best_burt = sorted_burts.get(0).unwrap();
+        debug!(target:"MaLB.av-training", "Best burt of generation {}/{}: {} with a guess of {} and a score of {}",
+            self.current_generation, self.generations, best_burt.id, best_burt.get_guess_display(), best_burt.get_score_display());
+
+        let mut amt_perfect = 0;
+        for b in &sorted_burts {
+            if b.score.unwrap() != 0 {
+                break;
+            }
+            amt_perfect += 1;
+        }
+        debug!(target:"MaLB.av-training", "Perfect burts this generation: {}", amt_perfect);
+
+        // go through and un-sort the burts
+        let mut new_burts: Vec<Burt> = Vec::new();
+        while !sorted_burts.is_empty() {
+            let current = sorted_burts.remove(0);
+            // mutate the current
+            //current.mutate(self.mutation_rate, self.range);
+
+            let mut placed = false;
+            for x in 0..new_burts.len() {
+                let b = new_burts.get(x).unwrap();
+                if current.id < b.id {
+                    new_burts.insert(x, current.clone());
+                    placed = true;
+                    break;
+                }
+            }
+            if !placed {
+                new_burts.push(current);
+            }
+        }
+        self.burts = new_burts;
+    }
+
     pub fn train(&mut self) {
 
         // todo(eric): Idea for training on multiple guesses to always guess the target with no mutation:
@@ -228,16 +336,32 @@ impl BurtGang {
         // bad_burts               - contains the burts that need to be re-educated
         let mut bad_burts = sorted_burts.split_off(survival_amt as usize);
 
+        let best_burt = sorted_burts.get(0).unwrap();
+        debug!(target:"MaLB.training", "Best burt of generation {}/{}: {} with a guess of {} and a score of {}",
+            self.current_generation, self.generations, best_burt.id, best_burt.get_guess_display(), best_burt.get_score_display());
+
+        let mut amt_perfect = 0;
+        for b in &sorted_burts {
+            if b.score.unwrap() != 0 {
+                break;
+            }
+            amt_perfect += 1;
+        }
+        debug!(target:"MaLB.training", "Perfect burts this generation: {}", amt_perfect);
+
         // go through and un-sort the burts
         let mut new_burts: Vec<Burt> = Vec::new();
         while !bad_burts.is_empty() {
             let mut current = bad_burts.remove(0);
 
             // re-educate and mutate the current
-            let teacher = sorted_burts.get(thread_rng().gen_range(0..sorted_burts.len())).unwrap();
-            let new_mu = teacher.mu.clone();
-            let new_sigma = teacher.sigma.clone();
+            let best_burt = sorted_burts.get(0).unwrap();
+            // get the best burt
+            let new_mu = best_burt.mu.clone();
+            let new_sigma = best_burt.sigma.clone();
+            // set the new values
             current.reeducate(new_mu, new_sigma);
+            // if the score of the best burt is not 0
             current.mutate(self.mutation_rate, self.range);
 
             let mut placed = false;
