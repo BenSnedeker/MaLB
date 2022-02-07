@@ -57,7 +57,7 @@ impl Burt {
         })
     }
 
-    pub fn guess(&mut self, target: u32, range: u32) -> (u32, u32) {
+    pub fn training_guess(&mut self, target: u32, range: u32) -> (u32, u32) {
         // normal distribution
         let normal = Normal::new(self.mu, self.sigma)
             .expect(format!("Failed to create normal for Burt #{}", self.id).as_str());
@@ -70,6 +70,18 @@ impl Burt {
         self.score = Some(distance_from(target, guess));
 
         (guess, self.score.unwrap().clone())
+    }
+
+    pub fn think(&mut self, input: f32, range: f32) -> f32 {
+        // normal distribution
+        let normal = Normal::new(self.mu, self.sigma)
+            .expect(format!("Failed to create normal for Burt #{}", self.id).as_str());
+        let mut number = range + 1.0;
+        while number > range {
+            number = normal.sample(&mut thread_rng());
+        }
+
+        input * number
     }
 
     pub fn reeducate(&mut self, mu: f32, sigma: f32) {
@@ -162,7 +174,7 @@ impl BurtGang {
 
         // loop through the burts and have them guess
         for b in &mut self.burts {
-            let (guess, score) = b.guess(self.target, self.range);
+            let (guess, score) = b.training_guess(self.target, self.range);
             total_guess += guess as usize;
             total_score += score as usize;
             runs += 1;
