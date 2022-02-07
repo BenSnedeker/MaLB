@@ -85,6 +85,7 @@ impl Burt {
     }
 
     pub fn mutate(&mut self, mutation_rate: f32, range: u32) {
+        // todo(eric): This means that theoretically a generation can go by with no mutation
         let mu_mut_amt = thread_rng().gen_range(0.0..((range as f32) * mutation_rate));
         // mu
         if thread_rng().gen_bool(0.5) {
@@ -209,7 +210,10 @@ impl BurtGang {
         }
 
         // with the sorted burt list, "re-educate" the lesser Burts
-        let survival_amt = (sorted_burts.len() as f32 * self.survival_rate) as u32;
+        let mut survival_amt = (sorted_burts.len() as f32 * self.survival_rate) as u32;
+        if survival_amt < 1 {
+            survival_amt = 1;
+        }
         // split sorted_burts into 2 vectors:
         // original (sorted_burts) - contains the burts that survived
         // bad_burts               - contains the burts that need to be re-educated
