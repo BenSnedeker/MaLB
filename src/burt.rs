@@ -279,8 +279,8 @@ impl BurtGang {
             // mutate the burts that need it
             // if the current score is not 0 (not perfect)
             if current.score.unwrap() != 0 {
-                let survival_amt = (burts2.len() as f32 * self.survival_rate) as usize;
-                let selected_best = burts2.get(thread_rng().gen_range(0..survival_amt)).unwrap();
+                let survival_amt = ((burts2.len() as f32 * self.survival_rate) as usize).min(1);
+                let selected_best = burts2.get(thread_rng().gen_range(0..survival_amt.min(1))).unwrap();
                 // change the current's values to bmu and bsigma
                 current.reeducate(selected_best.mu, selected_best.sigma, false);
                 //current.reeducate(bmu, bsigma, false);
