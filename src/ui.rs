@@ -48,7 +48,8 @@ pub fn draw_home(rect: &mut Frame<CrosstermBackend<Stdout>>, chunks: &Vec<Rect>,
             Style::default().fg(Color::LightYellow),
         )]),
         Spans::from(vec![Span::raw("")]),
-        Spans::from(vec![Span::raw("Press 'h' for Home, 'b' for Burts, 'l' for Logs, 't' to run a command, and 'q' for Quit")]),
+        Spans::from(vec![Span::raw("Press 'h' for Home, 'b' for Burts, 'l' for Logs, 's' to start/stop,")]),
+        Spans::from(vec![Span::raw("'r' to reset, 't' to run a command, and 'q' for Quit")]),
     ])
         .alignment(Alignment::Center)
         .block(

@@ -23,6 +23,8 @@ pub(crate) mod input;
 mod ui;
 mod burt;
 
+pub const ADVANCED_TRAINING: bool = false;
+
 fn main() {
     // get arguments
     let args: Vec<String> = env::args().collect();
@@ -34,9 +36,9 @@ fn main() {
     let mut burt_gang = if args.contains(&"-d".to_string()) || args.contains(&"--default".to_string()) {
         let default_range = 100;
         BurtGang::new(populate_burts(150,
-                                     default_range.clone()),
+                                     default_range.clone(), true),
                       default_range, 7, 150,
-                      0.5, 0.25)
+                      0.25, 0.25)
     } else {
         get_burt_gang()
     };
@@ -109,8 +111,8 @@ fn main() {
     let mut error_start: Option<Instant> = None;
 
     let generation_delay = Duration::from_millis(0);
-
     let mut last_gen_run: Option<Instant> = None;
+    let mut running = false;
 
     // start the main loop
     loop {
@@ -288,9 +290,10 @@ fn main() {
                     } else {
                         match event.code {
                             KeyCode::Char('q') => break,
+                            KeyCode::Char('s') => running = !running,
                             KeyCode::Char('r') => {
                                 burt_gang = BurtGang::new(populate_burts(starting_burt_count.clone(),
-                                                                         starting_range.clone()),
+                                                                         starting_range.clone(), false),
                                                           starting_range.clone(),
                                                           starting_target.clone(), starting_generations.clone(),
                                                           starting_survival_rate.clone(),
@@ -311,7 +314,7 @@ fn main() {
                             KeyCode::Char('e') => {
                                 info!(target:"MalB", "User forced run of training generation: {}/{}",
                                     burt_gang.current_generation, burt_gang.generations);
-                                burt_gang.train();
+                                burt_gang.train(ADVANCED_TRAINING);
                             },
                             KeyCode::Down => {
                                 if let Some(selected) = burt_list_state.selected() {
@@ -341,14 +344,14 @@ fn main() {
         }
 
         // handle running training
-        if burt_gang.current_generation < burt_gang.generations {
+        if running && burt_gang.current_generation < burt_gang.generations {
             if last_gen_run.is_some() {
                 if last_gen_run.unwrap().elapsed() >= generation_delay {
-                    burt_gang.train();
+                    burt_gang.train(ADVANCED_TRAINING);
                     last_gen_run = Some(Instant::now());
                 }
             } else {
-                burt_gang.train();
+                burt_gang.train(ADVANCED_TRAINING);
                 last_gen_run = Some(Instant::now());
             }
         } else {
