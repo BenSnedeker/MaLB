@@ -462,6 +462,19 @@ fn main() {
                                 }
                                 burt_gang.mutation_rate = n;
                             }
+                            "burt_count" => {
+                                let parsed = value.parse::<u32>();
+                                if parsed.is_err() {
+                                    footer_txt = format!("Invalid value: target expects a value above 0!");
+                                    footer_col = Color::LightRed;
+                                    error_start = Some(Instant::now());
+                                    input_ready = false;
+                                    user_input = String::new();
+                                    continue;
+                                }
+                                let n = parsed.unwrap();
+                                burt_gang.burts = populate_burts(n, burt_gang.range, false);
+                            }
                             _ => {
                                 footer_txt = format!("Invalid variable!");
                                 footer_col = Color::LightRed;
@@ -471,6 +484,11 @@ fn main() {
                                 continue;
                             }
                         }
+                    }
+                    "cock" => {
+                        footer_txt = format!("Cock mode activated");
+                        footer_col = Color::LightYellow;
+                        error_start = Some(Instant::now());
                     }
                     _ => {
                         footer_txt = format!("Invalid Command!");
