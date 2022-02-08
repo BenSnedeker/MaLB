@@ -110,7 +110,7 @@ impl Burt {
             }
         }
 
-        let sigma_mut_amt = thread_rng().gen_range(0.0..mutation_rate);
+        let sigma_mut_amt = thread_rng().gen_range(0.0..((range as f32) * mutation_rate));
         // sigma
         if thread_rng().gen_bool(0.5) {
             self.sigma += sigma_mut_amt;
@@ -169,19 +169,19 @@ impl BurtGang {
 
     pub fn train(&mut self, advanced: bool) {
         if advanced {
-            self.train_adv();
+            self.train_sticky();
         } else {
             self.train_normal();
         }
     }
 
-    fn train_adv(&mut self) {
+    fn train_sticky(&mut self) {
         self.current_generation += 1;
 
         // store variables for averages
         let mut total_score: usize = 0;
         let mut total_guess: usize = 0;
-        let mut runs: u32 = 0;
+        let mut burt_size: u32 = 0;
 
         // loop through the burts and have them guess
         for b in &mut self.burts {
@@ -189,12 +189,12 @@ impl BurtGang {
             let (guess, score) = b.training_think(self.target, self.range);
             total_guess += guess as usize;
             total_score += score as usize;
-            runs += 1;
+            burt_size += 1;
         }
 
         // set the averages
-        self.average_guess = Some((total_guess / runs as usize) as u32);
-        self.average_score = Some((total_score / runs as usize) as u32);
+        self.average_guess = Some((total_guess / burt_size as usize) as u32);
+        self.average_score = Some((total_score / burt_size as usize) as u32);
 
         // sort the burts into [0] best -> [len() - 1] worst
         let mut sorted_burts: Vec<Burt> = Vec::new();
@@ -270,25 +270,26 @@ impl BurtGang {
 
         let mut mutated_burts: u32 = 0;
 
+        for b in &mut sorted_burts {
+            // mutate the burts that need it
+            // if the current score is not 0 (not perfect)
+            if b.score.unwrap() != 0 {
+                // change the current's values to bmu and bsigma
+                b.reeducate(bmu, bsigma, false);
+
+                // if the best score is not 0
+                if amt_perfect != burt_size - 1 && bscore != 0 {
+                    mutated_burts += 1;
+                    // mutate current's values
+                    b.mutate(self.mutation_rate, self.range);
+                }
+            }
+        }
+
         // go through and re-sort the burts based on id
         let mut new_burts: Vec<Burt> = Vec::new();
         while !sorted_burts.is_empty() {
-            let mut current = sorted_burts.remove(0);
-
-            // mutate the burts that need it
-            // todo(eric): currently this either mutates all of them or none of them, and I have no clue why
-            // if the current score is not 0 (not perfect)
-            if current.score.unwrap() != 0 {
-                // change the current's values to bmu and bsigma
-                current.reeducate(bmu, bsigma, true);
-
-                // if the best score is not 0
-                if bscore != 0 {
-                    mutated_burts += 1;
-                    // mutate current's values
-                    current.mutate(self.mutation_rate, self.range);
-                }
-            }
+            let current = sorted_burts.remove(0);
 
             // place it in the correct location based on it's id
             let mut placed = false;

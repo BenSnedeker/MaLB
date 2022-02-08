@@ -23,7 +23,7 @@ pub(crate) mod input;
 mod ui;
 mod burt;
 
-pub const ADVANCED_TRAINING: bool = false;
+pub const TRAIN_STICKY: bool = true;
 
 fn main() {
     // get arguments
@@ -314,7 +314,7 @@ fn main() {
                             KeyCode::Char('e') => {
                                 info!(target:"MalB", "User forced run of training generation: {}/{}",
                                     burt_gang.current_generation, burt_gang.generations);
-                                burt_gang.train(ADVANCED_TRAINING);
+                                burt_gang.train(TRAIN_STICKY);
                             },
                             KeyCode::Down => {
                                 if let Some(selected) = burt_list_state.selected() {
@@ -347,11 +347,11 @@ fn main() {
         if running && burt_gang.current_generation < burt_gang.generations {
             if last_gen_run.is_some() {
                 if last_gen_run.unwrap().elapsed() >= generation_delay {
-                    burt_gang.train(ADVANCED_TRAINING);
+                    burt_gang.train(TRAIN_STICKY);
                     last_gen_run = Some(Instant::now());
                 }
             } else {
-                burt_gang.train(ADVANCED_TRAINING);
+                burt_gang.train(TRAIN_STICKY);
                 last_gen_run = Some(Instant::now());
             }
         } else {
