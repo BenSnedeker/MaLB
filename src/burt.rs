@@ -269,22 +269,28 @@ impl BurtGang {
         debug!(target:"MaLB.train.stick", "Perfect burts this generation: {}", amt_perfect);
 
         let mut mutated_burts: u32 = 0;
+        let burts2 = sorted_burts.clone();
 
         for b in &mut sorted_burts {
             // mutate the burts that need it
             // if the current score is not 0 (not perfect)
             if b.score.unwrap() != 0 {
+                let mut survival_amt = (burts2.len() as f32 * self.survival_rate) as usize;
+                let selected_best = burts2.get(thread_rng().gen_range(0..survival_amt)).unwrap();
                 // change the current's values to bmu and bsigma
-                b.reeducate(bmu, bsigma, false);
+                b.reeducate(selected_best.mu, selected_best.sigma, false);
+                //b.reeducate(bmu, bsigma, false);
 
-                // if the best score is not 0
-                if amt_perfect != burt_size - 1 && bscore != 0 {
+                // if not all the burts are not perfect
+                if amt_perfect != burt_size - 1 {
                     mutated_burts += 1;
                     // mutate current's values
                     b.mutate(self.mutation_rate, self.range);
                 }
             }
         }
+
+        drop(burts2);
 
         // go through and re-sort the burts based on id
         let mut new_burts: Vec<Burt> = Vec::new();
