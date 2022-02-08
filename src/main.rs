@@ -485,8 +485,10 @@ fn main() {
                             }
                         }
                     }
-                    "cock" => {
-                        footer_txt = format!("Cock mode activated");
+                    "mode" => {
+                        let mode = cmd_args.join(" ");
+
+                        footer_txt = format!("{} mode activated", mode);
                         footer_col = Color::LightYellow;
                         error_start = Some(Instant::now());
                     }
