@@ -271,31 +271,27 @@ impl BurtGang {
         let mut mutated_burts: u32 = 0;
         let burts2 = sorted_burts.clone();
 
-        for b in &mut sorted_burts {
+        // go through and re-sort the burts based on id
+        let mut new_burts: Vec<Burt> = Vec::new();
+        while !sorted_burts.is_empty() {
+            let mut current = sorted_burts.remove(0);
+
             // mutate the burts that need it
             // if the current score is not 0 (not perfect)
-            if b.score.unwrap() != 0 {
-                let mut survival_amt = (burts2.len() as f32 * self.survival_rate) as usize;
+            if current.score.unwrap() != 0 {
+                let survival_amt = (burts2.len() as f32 * self.survival_rate) as usize;
                 let selected_best = burts2.get(thread_rng().gen_range(0..survival_amt)).unwrap();
                 // change the current's values to bmu and bsigma
-                b.reeducate(selected_best.mu, selected_best.sigma, false);
-                //b.reeducate(bmu, bsigma, false);
+                current.reeducate(selected_best.mu, selected_best.sigma, false);
+                //current.reeducate(bmu, bsigma, false);
 
                 // if not all the burts are not perfect
                 if amt_perfect != burt_size - 1 {
                     mutated_burts += 1;
                     // mutate current's values
-                    b.mutate(self.mutation_rate, self.range);
+                    current.mutate(self.mutation_rate, self.range);
                 }
             }
-        }
-
-        drop(burts2);
-
-        // go through and re-sort the burts based on id
-        let mut new_burts: Vec<Burt> = Vec::new();
-        while !sorted_burts.is_empty() {
-            let current = sorted_burts.remove(0);
 
             // place it in the correct location based on it's id
             let mut placed = false;
@@ -311,6 +307,8 @@ impl BurtGang {
                 new_burts.push(current);
             }
         }
+
+        drop(burts2);
 
         debug!(target:"MaLB.train.stick", "Mutated Burts: {}", mutated_burts);
 

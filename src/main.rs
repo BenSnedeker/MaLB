@@ -38,7 +38,7 @@ fn main() {
         BurtGang::new(populate_burts(150,
                                      default_range.clone(), true),
                       default_range, 7, 150,
-                      0.01, 0.25)
+                      0.25, 0.01)
     } else {
         get_burt_gang()
     };
