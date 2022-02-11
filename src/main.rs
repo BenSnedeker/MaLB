@@ -23,7 +23,7 @@ pub(crate) mod input;
 mod ui;
 mod burt;
 
-pub const TRAIN_STICKY: bool = true;
+pub const TRAIN_STICKY: bool = false;
 
 fn main() {
     // get arguments
